@@ -8,8 +8,6 @@ import (
 )
 
 // Server is gophkeeper server.
-//
-// @todo #2 Implement HTTPS interface.
 type Server struct {
 	Rest rest.Rest
 }
