@@ -3,6 +3,8 @@ package server
 import "context"
 
 // Server is gophkeeper server.
+//
+// @todo #2 Implement HTTPS interface.
 type Server struct{}
 
 // MakeServer returns a new Server.
