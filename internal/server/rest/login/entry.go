@@ -1,4 +1,4 @@
-package register
+package login
 
 import (
 	"encoding/json"
@@ -14,7 +14,7 @@ type Entry struct {
 	Repository identity.Repository
 }
 
-// Route routes login entry.
+// Route routes this entry into an http.Handler.
 func (e *Entry) Route() http.Handler {
 	var router = chi.NewRouter()
 	router.Post("/", e.post)
@@ -46,17 +46,16 @@ func (e *Entry) post(out http.ResponseWriter, in *http.Request) {
 		return
 	}
 
-	if err := e.Repository.Register(in.Context(), credential); err != nil {
+	var token, authenticateError = e.Repository.Authenticate(in.Context(), credential)
+	if authenticateError != nil {
 		var status = http.StatusInternalServerError
-		if errors.Is(err, identity.ErrBadCredential) {
+		if errors.Is(authenticateError, identity.ErrBadCredential) {
 			status = http.StatusBadRequest
-		}
-		if errors.Is(err, identity.ErrIdentityDuplicate) {
-			status = http.StatusConflict
 		}
 		http.Error(out, http.StatusText(status), status)
 		return
 	}
 
-	out.WriteHeader(http.StatusCreated)
+	out.Header().Set("Authorization", (string)(token))
+	out.WriteHeader(http.StatusOK)
 }
