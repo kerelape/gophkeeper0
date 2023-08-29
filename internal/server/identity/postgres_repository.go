@@ -19,7 +19,8 @@ var initializePostgresQuery string
 type PostgresRepository struct {
 	connection deferred.Deferred[*pgx.Conn]
 
-	DSN string
+	DSN       string
+	JWTSecret string
 
 	UsernameMinLength uint
 	PasswordMinLength uint
@@ -37,15 +38,11 @@ func (r *PostgresRepository) Register(ctx context.Context, credential Credential
 		return connectionError
 	}
 
-	if r.UsernameMinLength > 0 {
-		if len(credential.Username) < (int)(r.UsernameMinLength) {
-			return ErrBadCredential
-		}
+	if len(credential.Username) < (int)(r.UsernameMinLength) {
+		return ErrBadCredential
 	}
-	if r.PasswordMinLength > 0 {
-		if len(credential.Password) < (int)(r.PasswordMinLength) {
-			return ErrBadCredential
-		}
+	if len(credential.Password) < (int)(r.PasswordMinLength) {
+		return ErrBadCredential
 	}
 
 	var password, passwordError = bcrypt.GenerateFromPassword(
