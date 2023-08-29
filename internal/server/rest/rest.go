@@ -20,9 +20,10 @@ var _ runnable.Runnable = (*Rest)(nil)
 // Run implement runnable.Runnable for Rest.
 func (r *Rest) Run(ctx context.Context) error {
 	var (
+		entry  = Entry{}
 		server = http.Server{
 			Addr:    r.Address,
-			Handler: nil, // @todo #5 implement REST api handler.
+			Handler: entry.Route(),
 		}
 		serverErrorChannel = make(chan error)
 	)
