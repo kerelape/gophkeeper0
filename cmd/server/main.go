@@ -21,6 +21,8 @@ func main() {
 			Address:  configuration.Rest.Address,
 			CertFile: configuration.Rest.CertFile,
 			KeyFile:  configuration.Rest.KeyFile,
+
+			Repository: nil, // @todo #16 Implement identity repository.
 		},
 	}
 	runnable.Run(&gophkeeper)
