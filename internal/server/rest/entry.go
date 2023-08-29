@@ -24,6 +24,6 @@ func (e *Entry) Route() http.Handler {
 	var registretion = register.Entry{
 		Repository: e.Repository,
 	}
-	router.Mount("register", registretion.Route())
+	router.Mount("/register", registretion.Route())
 	return router
 }
