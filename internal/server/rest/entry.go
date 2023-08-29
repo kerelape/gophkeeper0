@@ -11,7 +11,6 @@ import (
 
 // Entry is the REST api entry.
 //
-// @todo #7 Implement authentication.
 // @todo #7 Implement text storage.
 // @todo #7 Implement blob storage.
 // @todo #7 Implement bank card storage.
