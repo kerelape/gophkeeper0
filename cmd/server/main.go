@@ -1,6 +1,9 @@
 package main
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/kerelape/gophkeeper/cmd/server/config"
 	"github.com/kerelape/gophkeeper/internal/server"
 	"github.com/kerelape/gophkeeper/internal/server/rest"
@@ -10,7 +13,8 @@ import (
 func main() {
 	var configuration config.Config
 	if err := config.Read(&configuration); err != nil {
-		panic(err)
+		fmt.Println(configuration.Description())
+		os.Exit(1)
 	}
 	var gophkeeper = server.Server{
 		Rest: rest.Rest{
