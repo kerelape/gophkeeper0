@@ -6,7 +6,6 @@ import (
 
 	"github.com/kerelape/gophkeeper/cmd/server/config"
 	"github.com/kerelape/gophkeeper/internal/server"
-	"github.com/kerelape/gophkeeper/internal/server/rest"
 	"github.com/pior/runnable"
 )
 
@@ -17,13 +16,11 @@ func main() {
 		os.Exit(1)
 	}
 	var gophkeeper = server.Server{
-		Rest: rest.Rest{
-			Address:  configuration.Rest.Address,
-			CertFile: configuration.Rest.CertFile,
-			KeyFile:  configuration.Rest.KeyFile,
+		RestAddress:  configuration.Rest.Address,
+		RestCertFile: configuration.Rest.CertFile,
+		RestKeyFile:  configuration.Rest.KeyFile,
 
-			Repository: nil, // @todo #16 Implement identity repository.
-		},
+		Repository: nil, // @todo #16 Implement identity repository.
 	}
 	runnable.Run(&gophkeeper)
 }
