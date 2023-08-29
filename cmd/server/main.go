@@ -28,7 +28,7 @@ func main() {
 		RestKeyFile:  configuration.Rest.KeyFile,
 
 		Repository: &identity.PostgresRepository{
-			PasswordEncoding: base64.StdEncoding,
+			PasswordEncoding: base64.RawStdEncoding,
 
 			DSN: configuration.DatabaseDSN,
 
