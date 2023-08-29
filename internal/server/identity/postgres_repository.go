@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/kerelape/gophkeeper/internal/deferred"
@@ -19,8 +21,11 @@ var initializePostgresQuery string
 type PostgresRepository struct {
 	connection deferred.Deferred[*pgx.Conn]
 
-	DSN       string
-	JWTSecret string
+	PasswordEncoding *base64.Encoding
+
+	DSN           string
+	TokenSecret   []byte
+	TokenLifespan time.Duration
 
 	UsernameMinLength uint
 	PasswordMinLength uint
@@ -57,7 +62,7 @@ func (r *PostgresRepository) Register(ctx context.Context, credential Credential
 		ctx,
 		`INSERT INTO identities(username, password) VALUES($1, $2)`,
 		credential.Username,
-		base64.StdEncoding.EncodeToString(password),
+		r.PasswordEncoding.EncodeToString(password),
 	)
 	if insertError != nil {
 		if err := new(pgconn.PgError); errors.As(insertError, &err) && err.Code == "23505" {
@@ -71,7 +76,45 @@ func (r *PostgresRepository) Register(ctx context.Context, credential Credential
 
 // Authenticate implements Repository.
 func (r *PostgresRepository) Authenticate(ctx context.Context, credential Credential) (Token, error) {
-	panic("unimplemented")
+	var connection, connectionError = r.connection.Get(ctx)
+	if connectionError != nil {
+		return (Token)(""), connectionError
+	}
+
+	var row = connection.QueryRow(
+		ctx,
+		`SELECT password FROM identities WHERE username = $1`,
+		credential.Username,
+	)
+	var encodedPassword string
+	if err := row.Scan(&encodedPassword); err != nil {
+		var pgerr pgconn.PgError
+		if errors.As(err, (any)(&pgerr)) {
+			return (Token)(""), ErrBadCredential
+		}
+		return (Token)(""), err
+	}
+
+	var password, decodePasswordError = r.PasswordEncoding.DecodeString(encodedPassword)
+	if decodePasswordError != nil {
+		return (Token)(""), decodePasswordError
+	}
+	if err := bcrypt.CompareHashAndPassword(password, ([]byte)(credential.Password)); err != nil {
+		return (Token)(""), errors.Join(ErrBadCredential, err)
+	}
+
+	var rawToken = jwt.NewWithClaims(
+		jwt.SigningMethodHS256,
+		jwt.MapClaims{
+			"exp": time.Now().Add(r.TokenLifespan).Unix(),
+			"sub": credential.Username,
+		},
+	)
+	var token, signTokenError = rawToken.SignedString(r.TokenSecret)
+	if signTokenError != nil {
+		return (Token)(""), signTokenError
+	}
+	return (Token)(token), nil
 }
 
 // Identity implements Repository.
