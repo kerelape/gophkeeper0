@@ -119,7 +119,42 @@ func (r *PostgresRepository) Authenticate(ctx context.Context, credential Creden
 
 // Identity implements Repository.
 func (r *PostgresRepository) Identity(ctx context.Context, token Token) (Identity, error) {
-	panic("unimplemented")
+	var parsedToken, parseTokenError = jwt.Parse(
+		(string)(token),
+		func(t *jwt.Token) (interface{}, error) {
+			return r.TokenSecret, nil
+		},
+	)
+	if parseTokenError != nil {
+		return nil, ErrBadCredential
+	}
+
+	var claims = parsedToken.Claims
+	if exp, err := claims.GetExpirationTime(); err == nil {
+		if exp.Before(time.Now()) {
+			return nil, ErrBadCredential
+		}
+	} else {
+		return nil, ErrBadCredential
+	}
+
+	var username string
+	if sub, err := claims.GetSubject(); err == nil {
+		username = sub
+	} else {
+		return nil, ErrBadCredential
+	}
+
+	var connection, connectionError = r.connection.Get(ctx)
+	if connectionError != nil {
+		return nil, connectionError
+	}
+
+	var identity = PostgresIdentity{
+		Connection: connection,
+		Username:   username,
+	}
+	return identity, nil
 }
 
 // Run implements Runnable.
