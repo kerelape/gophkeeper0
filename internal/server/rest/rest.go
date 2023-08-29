@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/kerelape/gophkeeper/internal/server/identity"
 	"github.com/pior/runnable"
 )
 
@@ -13,6 +14,8 @@ type Rest struct {
 	Address  string // Address is the address that REST api serves at.
 	CertFile string // CertFile is path to the cert file used for REST api.
 	KeyFile  string // KeyFile is path to the key file used for REST api.
+
+	Repository identity.Repository
 }
 
 var _ runnable.Runnable = (*Rest)(nil)
@@ -20,7 +23,9 @@ var _ runnable.Runnable = (*Rest)(nil)
 // Run implement runnable.Runnable for Rest.
 func (r *Rest) Run(ctx context.Context) error {
 	var (
-		entry  = Entry{}
+		entry = Entry{
+			Repository: r.Repository,
+		}
 		server = http.Server{
 			Addr:    r.Address,
 			Handler: entry.Route(),
