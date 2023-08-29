@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ilyakaznacheev/cleanenv"
 )
@@ -13,11 +14,18 @@ type Config struct {
 		CertFile string `env:"CERT_FILE" env-required:"true" env-description:"Path to HTTPS cert file for REST api."`
 		KeyFile  string `env:"KEY_FILE" env-required:"true" env-description:"Path to HTTPS key file for REST api."`
 	} `env-prefix:"REST_"`
+	Token struct {
+		Lifespan time.Duration `env:"LIFESPAN" env-description:"JWT Token lifespan in milliseconds" env-default:"15m"`
+		Secret   string        `env:"SECRET" env-description:"Base64 encoded JWT Token secret" env-required:"true"`
+	} `env-prefix:"TOKEN_"`
+	UsernameMinLength uint   `env:"USERNAME_MIN_LENGTH" env-description:"Username minimum length" env-default:"0"`
+	PasswordMinLength uint   `env:"PASSWORD_MIN_LENGTH" env-description:"Password minimum length" env-default:"0"`
+	DatabaseDSN       string `env:"DATABASE_DSN" env-description:"Database connection URL" env-required:"true"`
 }
 
 // Read reads the config.
 func Read(config *Config) error {
-	if err := cleanenv.ReadEnv(&config); err != nil {
+	if err := cleanenv.ReadEnv(config); err != nil {
 		return fmt.Errorf("read config: %w", err)
 	}
 	return nil
