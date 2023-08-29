@@ -9,9 +9,9 @@ import (
 // Config is configuration for gophkeeper's server.
 type Config struct {
 	Rest struct {
-		Address  string `env:"ADDRESS" env-default:":16355"`
-		CertFile string `env:"CERT_FILE" env-required:"true"`
-		KeyFile  string `env:"KEY_FILE" env-required:"true"`
+		Address  string `env:"ADDRESS" env-default:":16355" env-description:"Address that REST api listens on."`
+		CertFile string `env:"CERT_FILE" env-required:"true" env-description:"Path to HTTPS cert file for REST api."`
+		KeyFile  string `env:"KEY_FILE" env-required:"true" env-description:"Path to HTTPS key file for REST api."`
 	} `env-prefix:"REST_"`
 }
 
