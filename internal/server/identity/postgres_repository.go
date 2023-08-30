@@ -86,7 +86,7 @@ func (r *PostgresRepository) Authenticate(ctx context.Context, credential Creden
 		PasswordEncoding: r.PasswordEncoding,
 		Username:         credential.Username,
 	}
-	if err := identity.ComparePassword(ctx, credential.Password); err != nil {
+	if err := identity.comparePassword(ctx, credential.Password); err != nil {
 		return (Token)(""), err
 	}
 

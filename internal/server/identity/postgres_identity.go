@@ -20,8 +20,7 @@ type PostgresIdentity struct {
 
 var _ Identity = (*PostgresIdentity)(nil)
 
-// ComparePassword implements Identity.
-func (i *PostgresIdentity) ComparePassword(ctx context.Context, password string) error {
+func (i *PostgresIdentity) comparePassword(ctx context.Context, password string) error {
 	var row = i.Connection.QueryRow(
 		ctx,
 		`SELECT password FROM identities WHERE username = $1`,
