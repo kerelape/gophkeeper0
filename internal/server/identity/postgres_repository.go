@@ -81,26 +81,13 @@ func (r *PostgresRepository) Authenticate(ctx context.Context, credential Creden
 		return (Token)(""), connectionError
 	}
 
-	var row = connection.QueryRow(
-		ctx,
-		`SELECT password FROM identities WHERE username = $1`,
-		credential.Username,
-	)
-	var encodedPassword string
-	if err := row.Scan(&encodedPassword); err != nil {
-		var pgerr pgconn.PgError
-		if errors.As(err, (any)(&pgerr)) {
-			return (Token)(""), ErrBadCredential
-		}
+	var identity = PostgresIdentity{
+		Connection:       connection,
+		PasswordEncoding: r.PasswordEncoding,
+		Username:         credential.Username,
+	}
+	if err := identity.ComparePassword(ctx, credential.Password); err != nil {
 		return (Token)(""), err
-	}
-
-	var password, decodePasswordError = r.PasswordEncoding.DecodeString(encodedPassword)
-	if decodePasswordError != nil {
-		return (Token)(""), decodePasswordError
-	}
-	if err := bcrypt.CompareHashAndPassword(password, ([]byte)(credential.Password)); err != nil {
-		return (Token)(""), errors.Join(ErrBadCredential, err)
 	}
 
 	var rawToken = jwt.NewWithClaims(
@@ -150,9 +137,10 @@ func (r *PostgresRepository) Identity(ctx context.Context, token Token) (Identit
 		return nil, connectionError
 	}
 
-	var identity = PostgresIdentity{
-		Connection: connection,
-		Username:   username,
+	var identity = &PostgresIdentity{
+		Connection:       connection,
+		PasswordEncoding: r.PasswordEncoding,
+		Username:         username,
 	}
 	return identity, nil
 }
