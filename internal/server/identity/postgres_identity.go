@@ -20,6 +20,36 @@ type PostgresIdentity struct {
 
 var _ Identity = (*PostgresIdentity)(nil)
 
+// StorePiece implements Identity.
+func (i *PostgresIdentity) StorePiece(ctx context.Context, piece Piece, password string) (ResourceID, error) {
+	panic("unimplemented")
+}
+
+// RestorePiece implements Identity.
+func (i *PostgresIdentity) RestorePiece(ctx context.Context, rid ResourceID, password string) (Piece, error) {
+	panic("unimplemented")
+}
+
+// StoreBlob implements Identity.
+func (i *PostgresIdentity) StoreBlob(ctx context.Context, blob Blob, password string) (ResourceID, error) {
+	panic("unimplemented")
+}
+
+// RestoreBlob implements Identity.
+func (i *PostgresIdentity) RestoreBlob(ctx context.Context, rid ResourceID, password string) (Blob, error) {
+	panic("unimplemented")
+}
+
+// Delete implements Identity.
+func (i *PostgresIdentity) Delete(context.Context, ResourceID) error {
+	panic("unimplemented")
+}
+
+// List implements Identity.
+func (i *PostgresIdentity) List(context.Context) ([]Resource, error) {
+	panic("unimplemented")
+}
+
 func (i *PostgresIdentity) comparePassword(ctx context.Context, password string) error {
 	var row = i.Connection.QueryRow(
 		ctx,
