@@ -12,8 +12,6 @@ import (
 )
 
 // Entry is the REST api entry.
-//
-// @todo #7 Implement blob storage.
 type Entry struct {
 	Repository domain.Repository
 }
