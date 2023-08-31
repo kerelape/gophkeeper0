@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS identities(
 
 CREATE TABLE IF NOT EXISTS pieces(
     rid SERIAL PRIMARY KEY UNIQUE,
+    owner TEXT,
     meta TEXT,
     content BYTEA,
     salt BYTEA,
