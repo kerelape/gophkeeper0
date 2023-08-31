@@ -26,6 +26,7 @@ type PostgresRepository struct {
 	DSN           string
 	TokenSecret   []byte
 	TokenLifespan time.Duration
+	BlobsDir      string
 
 	UsernameMinLength uint
 	PasswordMinLength uint
@@ -141,6 +142,7 @@ func (r *PostgresRepository) Identity(ctx context.Context, token Token) (Identit
 		Connection:       connection,
 		PasswordEncoding: r.PasswordEncoding,
 		Username:         username,
+		BlobsDir:         r.BlobsDir,
 	}
 	return identity, nil
 }
