@@ -3,7 +3,7 @@ package server
 import (
 	"context"
 
-	"github.com/kerelape/gophkeeper/internal/server/identity"
+	"github.com/kerelape/gophkeeper/internal/server/domain"
 	"github.com/kerelape/gophkeeper/internal/server/rest"
 	"github.com/pior/runnable"
 )
@@ -14,7 +14,7 @@ type Server struct {
 	RestCertFile string // path to the cert file used for REST api.
 	RestKeyFile  string // path to the key file used for REST api.
 
-	Repository identity.Repository
+	Repository domain.Repository
 }
 
 var _ runnable.Runnable = (*Server)(nil)

@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/kerelape/gophkeeper/internal/server/identity"
+	"github.com/kerelape/gophkeeper/internal/server/domain"
 	"github.com/kerelape/gophkeeper/internal/server/rest/login"
 	"github.com/kerelape/gophkeeper/internal/server/rest/register"
 )
@@ -15,7 +15,7 @@ import (
 // @todo #7 Implement blob storage.
 // @todo #7 Implement bank card storage.
 type Entry struct {
-	Repository identity.Repository
+	Repository domain.Repository
 }
 
 // Route routes Entry into an http.Handler.
