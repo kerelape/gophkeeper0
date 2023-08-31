@@ -12,3 +12,12 @@ CREATE TABLE IF NOT EXISTS pieces(
     salt BYTEA,
     iv BYTEA,
 );
+
+CREATE TABLE IF NOT EXISTS blobs(
+    rid SERIAL PRIMARY KEY UNIQUE,
+    owner TEXT,
+    meta TEXT,
+    path TEXT,
+    salt BYTEA,
+    iv BYTEA,
+);

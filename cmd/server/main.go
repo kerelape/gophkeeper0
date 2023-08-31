@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"log"
 	"os"
+	"path"
 
 	"github.com/kerelape/gophkeeper/cmd/server/config"
 	"github.com/kerelape/gophkeeper/internal/server"
@@ -22,6 +23,10 @@ func main() {
 	if decodeSecretError != nil {
 		log.Fatalf("failed to parse token secret: %s", decodeSecretError.Error())
 	}
+	var wd, wdError = os.Getwd()
+	if wdError != nil {
+		log.Fatalf(wdError.Error())
+	}
 	var gophkeeper = server.Server{
 		RestAddress:  configuration.Rest.Address,
 		RestCertFile: configuration.Rest.CertFile,
@@ -30,7 +35,8 @@ func main() {
 		Repository: &domain.PostgresRepository{
 			PasswordEncoding: base64.RawStdEncoding,
 
-			DSN: configuration.DatabaseDSN,
+			DSN:      configuration.DatabaseDSN,
+			BlobsDir: path.Join(wd, "blobs"),
 
 			TokenSecret:   secret,
 			TokenLifespan: configuration.Token.Lifespan,
