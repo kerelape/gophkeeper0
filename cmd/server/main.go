@@ -7,7 +7,7 @@ import (
 
 	"github.com/kerelape/gophkeeper/cmd/server/config"
 	"github.com/kerelape/gophkeeper/internal/server"
-	"github.com/kerelape/gophkeeper/internal/server/identity"
+	"github.com/kerelape/gophkeeper/internal/server/domain"
 	"github.com/pior/runnable"
 )
 
@@ -27,7 +27,7 @@ func main() {
 		RestCertFile: configuration.Rest.CertFile,
 		RestKeyFile:  configuration.Rest.KeyFile,
 
-		Repository: &identity.PostgresRepository{
+		Repository: &domain.PostgresRepository{
 			PasswordEncoding: base64.RawStdEncoding,
 
 			DSN: configuration.DatabaseDSN,
