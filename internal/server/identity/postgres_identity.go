@@ -2,12 +2,17 @@ package identity
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/crypto/pbkdf2"
 )
 
 // PostgresIdentity is a postgres identity.
@@ -22,7 +27,40 @@ var _ Identity = (*PostgresIdentity)(nil)
 
 // StorePiece implements Identity.
 func (i *PostgresIdentity) StorePiece(ctx context.Context, piece Piece, password string) (ResourceID, error) {
-	panic("unimplemented")
+	var (
+		salt []byte = make([]byte, 8)
+		iv   []byte = make([]byte, 12)
+		key  []byte
+	)
+	if _, err := rand.Read(salt); err != nil {
+		return -1, err
+	}
+	if _, err := rand.Read(iv); err != nil {
+		return -1, err
+	}
+	key = pbkdf2.Key(([]byte)(password), salt, 4096, 32, sha256.New)
+	var block, blockError = aes.NewCipher(key)
+	if blockError != nil {
+		return -1, blockError
+	}
+	var aesgcm, aesgcmError = cipher.NewGCM(block)
+	if aesgcmError != nil {
+		return -1, aesgcmError
+	}
+	var content = aesgcm.Seal(nil, iv, piece.Content, nil)
+
+	result := i.Connection.QueryRow(
+		ctx,
+		`INSERT INTO pieces(owner, meta, content, salt, iv) VALUES($1, $2, $3, $4, $5) RETURNING rid`,
+		i.Username,
+		piece.Meta, content,
+		salt, iv,
+	)
+	var rid int64
+	if err := result.Scan(&rid); err != nil {
+		return -1, err
+	}
+	return (ResourceID)(rid), nil
 }
 
 // RestorePiece implements Identity.
