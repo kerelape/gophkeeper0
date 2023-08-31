@@ -15,6 +15,11 @@ import (
 	"golang.org/x/crypto/pbkdf2"
 )
 
+const (
+	keyLen  = 32
+	keyIter = 4096
+)
+
 // PostgresIdentity is a postgres identity.
 type PostgresIdentity struct {
 	Connection       *pgx.Conn
@@ -38,7 +43,7 @@ func (i *PostgresIdentity) StorePiece(ctx context.Context, piece Piece, password
 	if _, err := rand.Read(iv); err != nil {
 		return -1, err
 	}
-	key = pbkdf2.Key(([]byte)(password), salt, 4096, 32, sha256.New)
+	key = pbkdf2.Key(([]byte)(password), salt, keyIter, keyLen, sha256.New)
 	var block, blockError = aes.NewCipher(key)
 	if blockError != nil {
 		return -1, blockError
@@ -65,7 +70,42 @@ func (i *PostgresIdentity) StorePiece(ctx context.Context, piece Piece, password
 
 // RestorePiece implements Identity.
 func (i *PostgresIdentity) RestorePiece(ctx context.Context, rid ResourceID, password string) (Piece, error) {
-	panic("unimplemented")
+	var (
+		owner   string
+		meta    string
+		content []byte
+		iv      []byte
+		salt    []byte
+	)
+	var result = i.Connection.QueryRow(
+		ctx,
+		`SELECT (owner, meta, content, iv, salt) FROM pieces WHERE rid = $1`,
+		(int64)(rid),
+	)
+	if err := result.Scan(&owner, &meta, &content, &iv, &salt); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Piece{}, ErrResourceNotFound
+		}
+		return Piece{}, err
+	}
+	var key = pbkdf2.Key(([]byte)(password), salt, keyIter, keyLen, sha256.New)
+	var block, blockError = aes.NewCipher(key)
+	if blockError != nil {
+		return Piece{}, blockError
+	}
+	var aesgcm, aesgcmError = cipher.NewGCM(block)
+	if aesgcmError != nil {
+		return Piece{}, aesgcmError
+	}
+	var decryptedContent, openError = aesgcm.Open(nil, iv, content, nil)
+	if openError != nil {
+		return Piece{}, openError
+	}
+	var piece = Piece{
+		Meta:    meta,
+		Content: decryptedContent,
+	}
+	return piece, nil
 }
 
 // StoreBlob implements Identity.
