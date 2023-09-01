@@ -1,4 +1,4 @@
-package domain
+package postgres
 
 import (
 	"context"
@@ -15,11 +15,11 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// go:embed initialize_postgres.sql
-var initializePostgresQuery string
+// go:embed init.sql
+var initQuery string
 
-// PostgresRepository is a postgresql identity repository.
-type PostgresRepository struct {
+// Gophkeeper is a postgresql identity repository.
+type Gophkeeper struct {
 	connection deferred.Deferred[*pgx.Conn]
 
 	PasswordEncoding *base64.Encoding
@@ -34,12 +34,12 @@ type PostgresRepository struct {
 }
 
 var (
-	_ gophkeeper.Gophkeeper = (*PostgresRepository)(nil)
-	_ runnable.Runnable     = (*PostgresRepository)(nil)
+	_ gophkeeper.Gophkeeper = (*Gophkeeper)(nil)
+	_ runnable.Runnable     = (*Gophkeeper)(nil)
 )
 
 // Register implements Repository.
-func (r *PostgresRepository) Register(ctx context.Context, credential gophkeeper.Credential) error {
+func (r *Gophkeeper) Register(ctx context.Context, credential gophkeeper.Credential) error {
 	var connection, connectionError = r.connection.Get(ctx)
 	if connectionError != nil {
 		return connectionError
@@ -77,13 +77,13 @@ func (r *PostgresRepository) Register(ctx context.Context, credential gophkeeper
 }
 
 // Authenticate implements Repository.
-func (r *PostgresRepository) Authenticate(ctx context.Context, credential gophkeeper.Credential) (gophkeeper.Token, error) {
+func (r *Gophkeeper) Authenticate(ctx context.Context, credential gophkeeper.Credential) (gophkeeper.Token, error) {
 	var connection, connectionError = r.connection.Get(ctx)
 	if connectionError != nil {
 		return (gophkeeper.Token)(""), connectionError
 	}
 
-	var identity = PostgresIdentity{
+	var identity = Identity{
 		Connection:       connection,
 		PasswordEncoding: r.PasswordEncoding,
 		Username:         credential.Username,
@@ -107,7 +107,7 @@ func (r *PostgresRepository) Authenticate(ctx context.Context, credential gophke
 }
 
 // Identity implements Repository.
-func (r *PostgresRepository) Identity(ctx context.Context, token gophkeeper.Token) (gophkeeper.Identity, error) {
+func (r *Gophkeeper) Identity(ctx context.Context, token gophkeeper.Token) (gophkeeper.Identity, error) {
 	var parsedToken, parseTokenError = jwt.Parse(
 		(string)(token),
 		func(t *jwt.Token) (interface{}, error) {
@@ -139,7 +139,7 @@ func (r *PostgresRepository) Identity(ctx context.Context, token gophkeeper.Toke
 		return nil, connectionError
 	}
 
-	var identity = &PostgresIdentity{
+	var identity = &Identity{
 		Connection:       connection,
 		PasswordEncoding: r.PasswordEncoding,
 		Username:         username,
@@ -149,14 +149,14 @@ func (r *PostgresRepository) Identity(ctx context.Context, token gophkeeper.Toke
 }
 
 // Run implements Runnable.
-func (r *PostgresRepository) Run(ctx context.Context) error {
+func (r *Gophkeeper) Run(ctx context.Context) error {
 	var connection, connectError = pgx.Connect(ctx, r.DSN)
 	if connectError != nil {
 		return connectError
 	}
 	defer connection.Close(context.Background())
 
-	_, initializeError := connection.Exec(ctx, initializePostgresQuery)
+	_, initializeError := connection.Exec(ctx, initQuery)
 	if initializeError != nil {
 		return initializeError
 	}

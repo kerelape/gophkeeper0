@@ -1,4 +1,4 @@
-package domain
+package postgres
 
 import (
 	"bufio"
@@ -26,8 +26,8 @@ const (
 	keyIter = 4096
 )
 
-// PostgresIdentity is a postgres identity.
-type PostgresIdentity struct {
+// Identity is a postgres identity.
+type Identity struct {
 	Connection       *pgx.Conn
 	PasswordEncoding *base64.Encoding
 	BlobsDir         string
@@ -35,10 +35,10 @@ type PostgresIdentity struct {
 	Username string
 }
 
-var _ gophkeeper.Identity = (*PostgresIdentity)(nil)
+var _ gophkeeper.Identity = (*Identity)(nil)
 
 // StorePiece implements Identity.
-func (i *PostgresIdentity) StorePiece(ctx context.Context, piece gophkeeper.Piece, password string) (gophkeeper.ResourceID, error) {
+func (i *Identity) StorePiece(ctx context.Context, piece gophkeeper.Piece, password string) (gophkeeper.ResourceID, error) {
 	var (
 		salt []byte = make([]byte, 8)
 		iv   []byte = make([]byte, keyLen)
@@ -76,7 +76,7 @@ func (i *PostgresIdentity) StorePiece(ctx context.Context, piece gophkeeper.Piec
 }
 
 // RestorePiece implements Identity.
-func (i *PostgresIdentity) RestorePiece(ctx context.Context, rid gophkeeper.ResourceID, password string) (gophkeeper.Piece, error) {
+func (i *Identity) RestorePiece(ctx context.Context, rid gophkeeper.ResourceID, password string) (gophkeeper.Piece, error) {
 	var (
 		owner   string
 		meta    string
@@ -116,7 +116,7 @@ func (i *PostgresIdentity) RestorePiece(ctx context.Context, rid gophkeeper.Reso
 }
 
 // StoreBlob implements Identity.
-func (i *PostgresIdentity) StoreBlob(ctx context.Context, blob gophkeeper.Blob, password string) (gophkeeper.ResourceID, error) {
+func (i *Identity) StoreBlob(ctx context.Context, blob gophkeeper.Blob, password string) (gophkeeper.ResourceID, error) {
 	defer blob.Content.Close()
 	var (
 		salt     []byte = make([]byte, 8)
@@ -183,7 +183,7 @@ func (i *PostgresIdentity) StoreBlob(ctx context.Context, blob gophkeeper.Blob, 
 }
 
 // RestoreBlob implements Identity.
-func (i *PostgresIdentity) RestoreBlob(ctx context.Context, rid gophkeeper.ResourceID, password string) (gophkeeper.Blob, error) {
+func (i *Identity) RestoreBlob(ctx context.Context, rid gophkeeper.ResourceID, password string) (gophkeeper.Blob, error) {
 	var (
 		owner    string
 		meta     string
@@ -230,16 +230,16 @@ func (i *PostgresIdentity) RestoreBlob(ctx context.Context, rid gophkeeper.Resou
 }
 
 // Delete implements Identity.
-func (i *PostgresIdentity) Delete(context.Context, gophkeeper.ResourceID) error {
+func (i *Identity) Delete(context.Context, gophkeeper.ResourceID) error {
 	panic("unimplemented")
 }
 
 // List implements Identity.
-func (i *PostgresIdentity) List(context.Context) ([]gophkeeper.Resource, error) {
+func (i *Identity) List(context.Context) ([]gophkeeper.Resource, error) {
 	panic("unimplemented")
 }
 
-func (i *PostgresIdentity) comparePassword(ctx context.Context, password string) error {
+func (i *Identity) comparePassword(ctx context.Context, password string) error {
 	var row = i.Connection.QueryRow(
 		ctx,
 		`SELECT password FROM identities WHERE username = $1`,
