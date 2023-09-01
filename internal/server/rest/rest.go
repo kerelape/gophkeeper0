@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/kerelape/gophkeeper/internal/server/domain"
+	"github.com/kerelape/gophkeeper/pkg/gophkeeper"
 	"github.com/pior/runnable"
 )
 
@@ -15,7 +15,7 @@ type Rest struct {
 	CertFile string // CertFile is path to the cert file used for REST api.
 	KeyFile  string // KeyFile is path to the key file used for REST api.
 
-	Repository domain.Repository
+	Repository gophkeeper.Repository
 }
 
 var _ runnable.Runnable = (*Rest)(nil)
