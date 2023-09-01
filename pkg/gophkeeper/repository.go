@@ -27,9 +27,9 @@ type (
 	}
 )
 
-// Repository is an identity reposity.
-type Repository interface {
-	// Register registers a new identity into the reposity.
+// Gophkeeper is gophkeeper.
+type Gophkeeper interface {
+	// Register registers a new identity into gophkeeper.
 	Register(context.Context, Credential) error
 
 	// Authenticate authenticates an identity and returns an access token.

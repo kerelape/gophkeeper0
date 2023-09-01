@@ -11,7 +11,7 @@ import (
 
 // Entry is login entry.
 type Entry struct {
-	Repository gophkeeper.Repository
+	Repository gophkeeper.Gophkeeper
 }
 
 // Route routes login entry.

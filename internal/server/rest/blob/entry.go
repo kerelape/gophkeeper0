@@ -15,7 +15,7 @@ import (
 
 // Entry is blob entry.
 type Entry struct {
-	Repository gophkeeper.Repository
+	Repository gophkeeper.Gophkeeper
 }
 
 // Route routes blob entry.

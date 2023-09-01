@@ -13,7 +13,7 @@ import (
 
 // Entry is the REST api entry.
 type Entry struct {
-	Repository gophkeeper.Repository
+	Repository gophkeeper.Gophkeeper
 }
 
 // Route routes Entry into an http.Handler.

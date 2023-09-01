@@ -15,7 +15,7 @@ type Rest struct {
 	CertFile string // CertFile is path to the cert file used for REST api.
 	KeyFile  string // KeyFile is path to the key file used for REST api.
 
-	Repository gophkeeper.Repository
+	Repository gophkeeper.Gophkeeper
 }
 
 var _ runnable.Runnable = (*Rest)(nil)

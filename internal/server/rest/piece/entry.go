@@ -14,7 +14,7 @@ import (
 
 // Entry is piece entry.
 type Entry struct {
-	Repository gophkeeper.Repository
+	Repository gophkeeper.Gophkeeper
 }
 
 // Route routes piece entry.

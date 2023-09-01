@@ -34,7 +34,7 @@ type PostgresRepository struct {
 }
 
 var (
-	_ gophkeeper.Repository = (*PostgresRepository)(nil)
+	_ gophkeeper.Gophkeeper = (*PostgresRepository)(nil)
 	_ runnable.Runnable     = (*PostgresRepository)(nil)
 )
 
