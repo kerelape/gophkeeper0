@@ -88,8 +88,11 @@ func (g *RestGophkeeper) Authenticate(ctx context.Context, credential Credential
 }
 
 // Identity implements Gophkeeper.
-//
-// @todo #28 Implement Identity.
-func (*RestGophkeeper) Identity(context.Context, Token) (Identity, error) {
-	panic("unimplemented")
+func (g *RestGophkeeper) Identity(_ context.Context, token Token) (Identity, error) {
+	var identity = &RestIdentity{
+		Client: g.Client,
+		Server: g.Server,
+		Token:  token,
+	}
+	return identity, nil
 }
