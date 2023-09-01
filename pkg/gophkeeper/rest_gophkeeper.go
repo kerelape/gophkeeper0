@@ -17,8 +17,6 @@ type RestGophkeeper struct {
 var _ Gophkeeper = (*RestGophkeeper)(nil)
 
 // Register implements Gophkeeper.
-//
-// @todo #28 Implement registration.
 func (g *RestGophkeeper) Register(context context.Context, credential Credential) error {
 	var (
 		endpoint = fmt.Sprintf("%s/register", g.Server)
