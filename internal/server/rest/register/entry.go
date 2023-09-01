@@ -6,12 +6,12 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/kerelape/gophkeeper/internal/server/domain"
+	"github.com/kerelape/gophkeeper/pkg/gophkeeper"
 )
 
 // Entry is login entry.
 type Entry struct {
-	Repository domain.Repository
+	Repository gophkeeper.Gophkeeper
 }
 
 // Route routes login entry.
@@ -29,7 +29,7 @@ func (e *Entry) post(out http.ResponseWriter, in *http.Request) {
 		return
 	}
 
-	var credential domain.Credential
+	var credential gophkeeper.Credential
 	if val, ok := requestBody["username"].(string); ok {
 		credential.Username = val
 	} else {
@@ -48,10 +48,10 @@ func (e *Entry) post(out http.ResponseWriter, in *http.Request) {
 
 	if err := e.Repository.Register(in.Context(), credential); err != nil {
 		var status = http.StatusInternalServerError
-		if errors.Is(err, domain.ErrBadCredential) {
+		if errors.Is(err, gophkeeper.ErrBadCredential) {
 			status = http.StatusBadRequest
 		}
-		if errors.Is(err, domain.ErrIdentityDuplicate) {
+		if errors.Is(err, gophkeeper.ErrIdentityDuplicate) {
 			status = http.StatusConflict
 		}
 		http.Error(out, http.StatusText(status), status)

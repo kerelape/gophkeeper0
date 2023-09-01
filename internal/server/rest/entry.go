@@ -4,16 +4,16 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/kerelape/gophkeeper/internal/server/domain"
 	"github.com/kerelape/gophkeeper/internal/server/rest/blob"
 	"github.com/kerelape/gophkeeper/internal/server/rest/login"
 	"github.com/kerelape/gophkeeper/internal/server/rest/piece"
 	"github.com/kerelape/gophkeeper/internal/server/rest/register"
+	"github.com/kerelape/gophkeeper/pkg/gophkeeper"
 )
 
 // Entry is the REST api entry.
 type Entry struct {
-	Repository domain.Repository
+	Repository gophkeeper.Gophkeeper
 }
 
 // Route routes Entry into an http.Handler.

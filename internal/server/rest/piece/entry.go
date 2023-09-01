@@ -9,12 +9,12 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/kerelape/gophkeeper/internal/server/domain"
+	"github.com/kerelape/gophkeeper/pkg/gophkeeper"
 )
 
 // Entry is piece entry.
 type Entry struct {
-	Repository domain.Repository
+	Repository gophkeeper.Gophkeeper
 }
 
 // Route routes piece entry.
@@ -27,10 +27,10 @@ func (e *Entry) Route() http.Handler {
 
 func (e *Entry) encrypt(out http.ResponseWriter, in *http.Request) {
 	var token = in.Header.Get("Authorization")
-	var identity, identityError = e.Repository.Identity(in.Context(), (domain.Token)(token))
+	var identity, identityError = e.Repository.Identity(in.Context(), (gophkeeper.Token)(token))
 	if identityError != nil {
 		var status = http.StatusInternalServerError
-		if errors.Is(identityError, domain.ErrBadCredential) {
+		if errors.Is(identityError, gophkeeper.ErrBadCredential) {
 			status = http.StatusUnauthorized
 		}
 		http.Error(out, http.StatusText(status), status)
@@ -54,14 +54,14 @@ func (e *Entry) encrypt(out http.ResponseWriter, in *http.Request) {
 		return
 	}
 
-	var piece = domain.Piece{
+	var piece = gophkeeper.Piece{
 		Meta:    request.Meta,
 		Content: content,
 	}
 	var rid, storeError = identity.StorePiece(in.Context(), piece, request.Password)
 	if storeError != nil {
 		var status = http.StatusInternalServerError
-		if errors.Is(identityError, domain.ErrBadCredential) {
+		if errors.Is(identityError, gophkeeper.ErrBadCredential) {
 			status = http.StatusUnauthorized
 		}
 		http.Error(out, http.StatusText(status), status)
@@ -80,10 +80,10 @@ func (e *Entry) encrypt(out http.ResponseWriter, in *http.Request) {
 
 func (e *Entry) decrypt(out http.ResponseWriter, in *http.Request) {
 	var token = in.Header.Get("Authorization")
-	var identity, identityError = e.Repository.Identity(in.Context(), (domain.Token)(token))
+	var identity, identityError = e.Repository.Identity(in.Context(), (gophkeeper.Token)(token))
 	if identityError != nil {
 		var status = http.StatusInternalServerError
-		if errors.Is(identityError, domain.ErrBadCredential) {
+		if errors.Is(identityError, gophkeeper.ErrBadCredential) {
 			status = http.StatusUnauthorized
 		}
 		http.Error(out, http.StatusText(status), status)
@@ -105,10 +105,10 @@ func (e *Entry) decrypt(out http.ResponseWriter, in *http.Request) {
 		return
 	}
 
-	var piece, restoreError = identity.RestorePiece(in.Context(), (domain.ResourceID)(rid), request.Password)
+	var piece, restoreError = identity.RestorePiece(in.Context(), (gophkeeper.ResourceID)(rid), request.Password)
 	if restoreError != nil {
 		var status = http.StatusInternalServerError
-		if errors.Is(identityError, domain.ErrBadCredential) {
+		if errors.Is(identityError, gophkeeper.ErrBadCredential) {
 			status = http.StatusUnauthorized
 		}
 		http.Error(out, http.StatusText(status), status)

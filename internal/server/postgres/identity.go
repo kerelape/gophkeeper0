@@ -1,4 +1,4 @@
-package domain
+package postgres
 
 import (
 	"bufio"
@@ -16,6 +16,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/kerelape/gophkeeper/pkg/gophkeeper"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/crypto/pbkdf2"
 )
@@ -25,8 +26,8 @@ const (
 	keyIter = 4096
 )
 
-// PostgresIdentity is a postgres identity.
-type PostgresIdentity struct {
+// Identity is a postgres identity.
+type Identity struct {
 	Connection       *pgx.Conn
 	PasswordEncoding *base64.Encoding
 	BlobsDir         string
@@ -34,10 +35,10 @@ type PostgresIdentity struct {
 	Username string
 }
 
-var _ Identity = (*PostgresIdentity)(nil)
+var _ gophkeeper.Identity = (*Identity)(nil)
 
 // StorePiece implements Identity.
-func (i *PostgresIdentity) StorePiece(ctx context.Context, piece Piece, password string) (ResourceID, error) {
+func (i *Identity) StorePiece(ctx context.Context, piece gophkeeper.Piece, password string) (gophkeeper.ResourceID, error) {
 	var (
 		salt []byte = make([]byte, 8)
 		iv   []byte = make([]byte, keyLen)
@@ -71,11 +72,11 @@ func (i *PostgresIdentity) StorePiece(ctx context.Context, piece Piece, password
 	if err := result.Scan(&rid); err != nil {
 		return -1, err
 	}
-	return (ResourceID)(rid), nil
+	return (gophkeeper.ResourceID)(rid), nil
 }
 
 // RestorePiece implements Identity.
-func (i *PostgresIdentity) RestorePiece(ctx context.Context, rid ResourceID, password string) (Piece, error) {
+func (i *Identity) RestorePiece(ctx context.Context, rid gophkeeper.ResourceID, password string) (gophkeeper.Piece, error) {
 	var (
 		owner   string
 		meta    string
@@ -90,24 +91,24 @@ func (i *PostgresIdentity) RestorePiece(ctx context.Context, rid ResourceID, pas
 	)
 	if err := result.Scan(&owner, &meta, &content, &iv, &salt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Piece{}, ErrResourceNotFound
+			return gophkeeper.Piece{}, gophkeeper.ErrResourceNotFound
 		}
-		return Piece{}, err
+		return gophkeeper.Piece{}, err
 	}
 	var key = pbkdf2.Key(([]byte)(password), salt, keyIter, keyLen, sha256.New)
 	var block, blockError = aes.NewCipher(key)
 	if blockError != nil {
-		return Piece{}, blockError
+		return gophkeeper.Piece{}, blockError
 	}
 	var aesgcm, aesgcmError = cipher.NewGCM(block)
 	if aesgcmError != nil {
-		return Piece{}, aesgcmError
+		return gophkeeper.Piece{}, aesgcmError
 	}
 	var decryptedContent, openError = aesgcm.Open(nil, iv, content, nil)
 	if openError != nil {
-		return Piece{}, openError
+		return gophkeeper.Piece{}, openError
 	}
-	var piece = Piece{
+	var piece = gophkeeper.Piece{
 		Meta:    meta,
 		Content: decryptedContent,
 	}
@@ -115,7 +116,7 @@ func (i *PostgresIdentity) RestorePiece(ctx context.Context, rid ResourceID, pas
 }
 
 // StoreBlob implements Identity.
-func (i *PostgresIdentity) StoreBlob(ctx context.Context, blob Blob, password string) (ResourceID, error) {
+func (i *Identity) StoreBlob(ctx context.Context, blob gophkeeper.Blob, password string) (gophkeeper.ResourceID, error) {
 	defer blob.Content.Close()
 	var (
 		salt     []byte = make([]byte, 8)
@@ -178,11 +179,11 @@ func (i *PostgresIdentity) StoreBlob(ctx context.Context, blob Blob, password st
 	if _, err := reader.WriteTo(writer); err != nil {
 		return -1, err
 	}
-	return (ResourceID)(rid), nil
+	return (gophkeeper.ResourceID)(rid), nil
 }
 
 // RestoreBlob implements Identity.
-func (i *PostgresIdentity) RestoreBlob(ctx context.Context, rid ResourceID, password string) (Blob, error) {
+func (i *Identity) RestoreBlob(ctx context.Context, rid gophkeeper.ResourceID, password string) (gophkeeper.Blob, error) {
 	var (
 		owner    string
 		meta     string
@@ -198,24 +199,24 @@ func (i *PostgresIdentity) RestoreBlob(ctx context.Context, rid ResourceID, pass
 	)
 	if err := row.Scan(&owner, &meta, &blobPath, &iv, &salt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Blob{}, ErrResourceNotFound
+			return gophkeeper.Blob{}, gophkeeper.ErrResourceNotFound
 		}
-		return Blob{}, err
+		return gophkeeper.Blob{}, err
 	}
 	if owner != i.Username {
-		return Blob{}, ErrResourceNotFound
+		return gophkeeper.Blob{}, gophkeeper.ErrResourceNotFound
 	}
 
 	var file, openError = os.Open(blobPath)
 	if openError != nil {
-		return Blob{}, openError
+		return gophkeeper.Blob{}, openError
 	}
 	key = pbkdf2.Key(([]byte)(password), salt, keyIter, keyLen, sha256.New)
 	var block, blockError = aes.NewCipher(key)
 	if blockError != nil {
-		return Blob{}, blockError
+		return gophkeeper.Blob{}, blockError
 	}
-	var blob = Blob{
+	var blob = gophkeeper.Blob{
 		Meta: meta,
 		Content: &readCloser{
 			reader: cipher.StreamReader{
@@ -229,16 +230,16 @@ func (i *PostgresIdentity) RestoreBlob(ctx context.Context, rid ResourceID, pass
 }
 
 // Delete implements Identity.
-func (i *PostgresIdentity) Delete(context.Context, ResourceID) error {
+func (i *Identity) Delete(context.Context, gophkeeper.ResourceID) error {
 	panic("unimplemented")
 }
 
 // List implements Identity.
-func (i *PostgresIdentity) List(context.Context) ([]Resource, error) {
+func (i *Identity) List(context.Context) ([]gophkeeper.Resource, error) {
 	panic("unimplemented")
 }
 
-func (i *PostgresIdentity) comparePassword(ctx context.Context, password string) error {
+func (i *Identity) comparePassword(ctx context.Context, password string) error {
 	var row = i.Connection.QueryRow(
 		ctx,
 		`SELECT password FROM identities WHERE username = $1`,
@@ -248,7 +249,7 @@ func (i *PostgresIdentity) comparePassword(ctx context.Context, password string)
 	if err := row.Scan(&encodedPassword); err != nil {
 		var pgerr pgconn.PgError
 		if errors.As(err, (any)(&pgerr)) {
-			return ErrBadCredential
+			return gophkeeper.ErrBadCredential
 		}
 		return err
 	}
@@ -258,7 +259,7 @@ func (i *PostgresIdentity) comparePassword(ctx context.Context, password string)
 		return decodePasswordError
 	}
 	if err := bcrypt.CompareHashAndPassword(decodedPassword, ([]byte)(password)); err != nil {
-		return errors.Join(ErrBadCredential, err)
+		return errors.Join(gophkeeper.ErrBadCredential, err)
 	}
 	return nil
 }

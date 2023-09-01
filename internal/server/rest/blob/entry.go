@@ -10,12 +10,12 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/kerelape/gophkeeper/internal/server/domain"
+	"github.com/kerelape/gophkeeper/pkg/gophkeeper"
 )
 
 // Entry is blob entry.
 type Entry struct {
-	Repository domain.Repository
+	Repository gophkeeper.Gophkeeper
 }
 
 // Route routes blob entry.
@@ -28,10 +28,10 @@ func (e *Entry) Route() http.Handler {
 
 func (e *Entry) encrypt(out http.ResponseWriter, in *http.Request) {
 	var token = in.Header.Get("Authorization")
-	var identity, identityError = e.Repository.Identity(in.Context(), (domain.Token)(token))
+	var identity, identityError = e.Repository.Identity(in.Context(), (gophkeeper.Token)(token))
 	if identityError != nil {
 		var status = http.StatusInternalServerError
-		if errors.Is(identityError, domain.ErrBadCredential) {
+		if errors.Is(identityError, gophkeeper.ErrBadCredential) {
 			status = http.StatusUnauthorized
 		}
 		http.Error(out, http.StatusText(status), status)
@@ -55,7 +55,7 @@ func (e *Entry) encrypt(out http.ResponseWriter, in *http.Request) {
 	}
 	meta, _ = strings.CutSuffix(meta, (string)(0x00))
 
-	var blob = domain.Blob{
+	var blob = gophkeeper.Blob{
 		Meta:    meta,
 		Content: in.Body,
 	}
@@ -78,10 +78,10 @@ func (e *Entry) encrypt(out http.ResponseWriter, in *http.Request) {
 
 func (e *Entry) decrypt(out http.ResponseWriter, in *http.Request) {
 	var token = in.Header.Get("Authorization")
-	var identity, identityError = e.Repository.Identity(in.Context(), (domain.Token)(token))
+	var identity, identityError = e.Repository.Identity(in.Context(), (gophkeeper.Token)(token))
 	if identityError != nil {
 		var status = http.StatusInternalServerError
-		if errors.Is(identityError, domain.ErrBadCredential) {
+		if errors.Is(identityError, gophkeeper.ErrBadCredential) {
 			status = http.StatusUnauthorized
 		}
 		http.Error(out, http.StatusText(status), status)
@@ -104,10 +104,10 @@ func (e *Entry) decrypt(out http.ResponseWriter, in *http.Request) {
 		return
 	}
 
-	var blob, restoreError = identity.RestoreBlob(in.Context(), (domain.ResourceID)(rid), request.Password)
+	var blob, restoreError = identity.RestoreBlob(in.Context(), (gophkeeper.ResourceID)(rid), request.Password)
 	if restoreError != nil {
 		var status = http.StatusInternalServerError
-		if errors.Is(identityError, domain.ErrBadCredential) {
+		if errors.Is(identityError, gophkeeper.ErrBadCredential) {
 			status = http.StatusUnauthorized
 		}
 		http.Error(out, http.StatusText(status), status)
