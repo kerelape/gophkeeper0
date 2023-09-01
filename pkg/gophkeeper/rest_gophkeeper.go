@@ -17,21 +17,26 @@ type RestGophkeeper struct {
 var _ Gophkeeper = (*RestGophkeeper)(nil)
 
 // Register implements Gophkeeper.
-func (g *RestGophkeeper) Register(context context.Context, credential Credential) error {
-	var (
-		endpoint = fmt.Sprintf("%s/register", g.Server)
-		request  struct {
-			Username string `json:"username"`
-			Password string `json:"password"`
-		}
+func (g *RestGophkeeper) Register(ctx context.Context, credential Credential) error {
+	var endpoint = fmt.Sprintf("%s/register", g.Server)
+	var content, marshalError = json.Marshal(
+		map[string]any{
+			"username": credential.Username,
+			"password": credential.Password,
+		},
 	)
-	request.Username = credential.Username
-	request.Password = credential.Password
-	var content, marshalError = json.Marshal(&request)
 	if marshalError != nil {
 		return marshalError
 	}
-	response, postError := g.Client.Post(endpoint, "application/json", bytes.NewReader(content))
+	var request, requestError = http.NewRequestWithContext(
+		ctx,
+		http.MethodPost, endpoint,
+		bytes.NewReader(content),
+	)
+	if requestError != nil {
+		return requestError
+	}
+	response, postError := g.Client.Do(request)
 	if postError != nil {
 		return postError
 	}
