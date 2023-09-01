@@ -15,7 +15,7 @@ var _ Gophkeeper = (*RestGophkeeper)(nil)
 
 // Register implements Gophkeeper.
 //
-// @too #28 Implement registration.
+// @todo #28 Implement registration.
 func (*RestGophkeeper) Register(context.Context, Credential) error {
 	panic("unimplemented")
 }
