@@ -4,9 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 )
+
+// ErrIncompatibleAPI is returns when API is not compatible with implementation.
+var ErrIncompatibleAPI = errors.New("incompatable API")
 
 // RestGophkeeper is a remote gophkeeper.
 type RestGophkeeper struct {
@@ -47,7 +51,10 @@ func (g *RestGophkeeper) Register(ctx context.Context, credential Credential) er
 	case http.StatusOK:
 		return nil
 	default:
-		panic("unexpected response code")
+		return errors.Join(
+			fmt.Errorf("unexpected response status: %d", response.StatusCode),
+			ErrIncompatibleAPI,
+		)
 	}
 }
 
@@ -83,7 +90,10 @@ func (g *RestGophkeeper) Authenticate(ctx context.Context, credential Credential
 		var token = response.Header.Get("Authorization")
 		return (Token)(token), nil
 	default:
-		panic("unexpected response code")
+		return (Token)(""), errors.Join(
+			fmt.Errorf("unexpected response status: %d", response.StatusCode),
+			ErrIncompatibleAPI,
+		)
 	}
 }
 
