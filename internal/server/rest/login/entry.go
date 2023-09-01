@@ -50,7 +50,7 @@ func (e *Entry) post(out http.ResponseWriter, in *http.Request) {
 	if authenticateError != nil {
 		var status = http.StatusInternalServerError
 		if errors.Is(authenticateError, gophkeeper.ErrBadCredential) {
-			status = http.StatusBadRequest
+			status = http.StatusUnauthorized
 		}
 		http.Error(out, http.StatusText(status), status)
 		return
