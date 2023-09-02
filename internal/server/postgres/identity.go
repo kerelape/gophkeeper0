@@ -9,10 +9,11 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"log"
 	"os"
 	"path"
-	"strconv"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	composedreadcloser "github.com/kerelape/gophkeeper/internal/composed_read_closer"
@@ -39,6 +40,10 @@ var _ gophkeeper.Identity = (*Identity)(nil)
 
 // StorePiece implements Identity.
 func (i *Identity) StorePiece(ctx context.Context, piece gophkeeper.Piece, password string) (gophkeeper.ResourceID, error) {
+	if err := i.comparePassword(ctx, password); err != nil {
+		return -1, errors.Join(err, gophkeeper.ErrBadCredential)
+	}
+
 	var (
 		salt []byte = make([]byte, 8)
 		iv   []byte = make([]byte, keyLen)
@@ -61,40 +66,71 @@ func (i *Identity) StorePiece(ctx context.Context, piece gophkeeper.Piece, passw
 	}
 	var content = aesgcm.Seal(nil, iv, piece.Content, nil)
 
-	result := i.Connection.QueryRow(
+	var transaction, transactionError = i.Connection.Begin(ctx)
+	if transactionError != nil {
+		return -1, transactionError
+	}
+	defer transaction.Rollback(context.Background())
+
+	insertPieceResult := transaction.QueryRow(
 		ctx,
-		`INSERT INTO pieces(owner, meta, content, salt, iv) VALUES($1, $2, $3, $4, $5) RETURNING rid`,
-		i.Username,
-		piece.Meta, content,
-		salt, iv,
+		`INSERT INTO pieces(content, salt, iv) VALUES($1, $2, $3) RETURNING id`,
+		content, salt, iv,
 	)
-	var rid int64
-	if err := result.Scan(&rid); err != nil {
+	var id int
+	if err := insertPieceResult.Scan(&id); err != nil {
 		return -1, err
 	}
+	insertResourceResult := transaction.QueryRow(
+		ctx,
+		`INSERT INTO resources(meta, 'resource', 'type') VALUES($1, $2, $3) RETURNING id`,
+		piece.Meta, id, (int)(gophkeeper.ResourceTypePiece),
+	)
+	var rid int64
+	if err := insertResourceResult.Scan(&rid); err != nil {
+		return -1, err
+	}
+	if err := transaction.Commit(ctx); err != nil {
+		return -1, err
+	}
+
 	return (gophkeeper.ResourceID)(rid), nil
 }
 
 // RestorePiece implements Identity.
 func (i *Identity) RestorePiece(ctx context.Context, rid gophkeeper.ResourceID, password string) (gophkeeper.Piece, error) {
+	if err := i.comparePassword(ctx, password); err != nil {
+		return gophkeeper.Piece{}, errors.Join(err, gophkeeper.ErrBadCredential)
+	}
+
 	var (
-		owner   string
 		meta    string
 		content []byte
 		iv      []byte
 		salt    []byte
 	)
-	var result = i.Connection.QueryRow(
+
+	var queryResourceResult = i.Connection.QueryRow(
 		ctx,
-		`SELECT (owner, meta, content, iv, salt) FROM pieces WHERE rid = $1`,
-		(int64)(rid),
+		`SELECT (meta, 'resource') FROM resources WHERE id = $1 AND 'owner' = $2 AND 'type' = $3`,
+		(int64)(rid), i.Username, (int)(gophkeeper.ResourceTypePiece),
 	)
-	if err := result.Scan(&owner, &meta, &content, &iv, &salt); err != nil {
+	var id int
+	if err := queryResourceResult.Scan(&meta, &id); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return gophkeeper.Piece{}, gophkeeper.ErrResourceNotFound
 		}
 		return gophkeeper.Piece{}, err
 	}
+	var queryPieceResult = i.Connection.QueryRow(
+		ctx,
+		`SELECT (content, iv, salt) FROM pieces WHERE id = $1`,
+		id,
+	)
+	if err := queryPieceResult.Scan(&content, &iv, &salt); err != nil {
+		return gophkeeper.Piece{}, err
+	}
+
 	var key = pbkdf2.Key(([]byte)(password), salt, keyIter, keyLen, sha256.New)
 	var block, blockError = aes.NewCipher(key)
 	if blockError != nil {
@@ -108,6 +144,7 @@ func (i *Identity) RestorePiece(ctx context.Context, rid gophkeeper.ResourceID, 
 	if openError != nil {
 		return gophkeeper.Piece{}, openError
 	}
+
 	var piece = gophkeeper.Piece{
 		Meta:    meta,
 		Content: decryptedContent,
@@ -118,12 +155,13 @@ func (i *Identity) RestorePiece(ctx context.Context, rid gophkeeper.ResourceID, 
 // StoreBlob implements Identity.
 func (i *Identity) StoreBlob(ctx context.Context, blob gophkeeper.Blob, password string) (gophkeeper.ResourceID, error) {
 	defer blob.Content.Close()
+	if err := i.comparePassword(ctx, password); err != nil {
+		return -1, errors.Join(err, gophkeeper.ErrBadCredential)
+	}
+
 	var (
-		salt     []byte = make([]byte, 8)
-		iv       []byte = make([]byte, keyLen)
-		key      []byte
-		rid      int64
-		blobPath string
+		salt []byte = make([]byte, 8)
+		iv   []byte = make([]byte, keyLen)
 	)
 	if _, err := rand.Read(salt); err != nil {
 		return -1, err
@@ -131,88 +169,110 @@ func (i *Identity) StoreBlob(ctx context.Context, blob gophkeeper.Blob, password
 	if _, err := rand.Read(iv); err != nil {
 		return -1, err
 	}
-	key = pbkdf2.Key(([]byte)(password), salt, keyIter, keyLen, sha256.New)
-
-	var transaction, beginError = i.Connection.Begin(ctx)
-	if beginError != nil {
-		return -1, beginError
-	}
-	var ridRow = transaction.QueryRow(
-		ctx,
-		`INSERT INTO blobs(owner, meta, salt, iv) VALUES($1, $2, $3, $4) RETURNING rid`,
-		i.Username,
-		blob.Meta,
-		salt, iv,
+	var block, blockError = aes.NewCipher(
+		pbkdf2.Key(([]byte)(password), salt, keyIter, keyLen, sha256.New),
 	)
-	if err := ridRow.Scan(&rid); err != nil {
-		if err := transaction.Rollback(ctx); err != nil {
-			return -1, err
+	if blockError != nil {
+		return -1, blockError
+	}
+
+	var location = path.Join(i.BlobsDir, uuid.New().String())
+	var file, createError = os.Create(location)
+	if createError != nil {
+		return -1, createError
+	}
+
+	var (
+		writer = cipher.StreamWriter{
+			S: cipher.NewCTR(block, iv),
+			W: file,
+		}
+		reader = bufio.NewReader(blob.Content)
+	)
+	if _, err := reader.WriteTo(writer); err != nil {
+		if err := file.Close(); err != nil {
+			log.Printf("failed to close file: %s\n", err.Error())
+		}
+		if err := os.Remove(location); err != nil {
+			log.Printf("failed to remove file: %s\n", err.Error())
 		}
 		return -1, err
 	}
-	blobPath = path.Join(i.BlobsDir, strconv.Itoa((int)(rid)))
-	_, updateError := transaction.Exec(
-		ctx,
-		`UPDATE blobs SET path = $1 WHERE rid = $2`,
-		blobPath, rid,
+	if err := file.Close(); err != nil {
+		log.Printf("failed to close file: %s\n", err.Error())
+		return -1, err
+	}
+
+	var transaction, transactionError = i.Connection.Begin(ctx)
+	if transactionError != nil {
+		return -1, transactionError
+	}
+	defer transaction.Rollback(context.Background())
+	var (
+		blobID int
+		rid    int64
 	)
-	if updateError != nil {
-		return -1, updateError
+	var insertBlobResult = transaction.QueryRow(
+		ctx,
+		`INSERT INTO blobs('location', iv, salt) VALUES($1, $2, $3) RETURNING id`,
+		location, iv, salt,
+	)
+	if err := insertBlobResult.Scan(&blobID); err != nil {
+		return -1, err
+	}
+	var insertResourceResult = transaction.QueryRow(
+		ctx,
+		`INSERT INTO resources(meta, 'owner', 'type', 'resource') VALUES($1, $2, $3, $4) RETURNING id`,
+		blob.Meta, i.Username, gophkeeper.ResourceTypeBlob, blobID,
+	)
+	if err := insertResourceResult.Scan(&rid); err != nil {
+		return -1, err
 	}
 	if err := transaction.Commit(ctx); err != nil {
 		return -1, err
 	}
 
-	var file, createError = os.Create(blobPath)
-	if createError != nil {
-		return -1, createError
-	}
-	var block, blockError = aes.NewCipher(key)
-	if blockError != nil {
-		return -1, blockError
-	}
-	var writer = cipher.StreamWriter{
-		S: cipher.NewCTR(block, iv),
-		W: file,
-	}
-	var reader = bufio.NewReader(blob.Content)
-	if _, err := reader.WriteTo(writer); err != nil {
-		return -1, err
-	}
 	return (gophkeeper.ResourceID)(rid), nil
 }
 
 // RestoreBlob implements Identity.
 func (i *Identity) RestoreBlob(ctx context.Context, rid gophkeeper.ResourceID, password string) (gophkeeper.Blob, error) {
-	var (
-		owner    string
-		meta     string
-		blobPath string
-		iv       []byte
-		salt     []byte
-		key      []byte
-	)
-	var row = i.Connection.QueryRow(
-		ctx,
-		`SELECT (owner, meta, path, iv, salt) FROM blobs WHERE rid = $1`,
-		(int64)(rid),
-	)
-	if err := row.Scan(&owner, &meta, &blobPath, &iv, &salt); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return gophkeeper.Blob{}, gophkeeper.ErrResourceNotFound
-		}
-		return gophkeeper.Blob{}, err
-	}
-	if owner != i.Username {
-		return gophkeeper.Blob{}, gophkeeper.ErrResourceNotFound
+	if err := i.comparePassword(ctx, password); err != nil {
+		return gophkeeper.Blob{}, errors.Join(err, gophkeeper.ErrBadCredential)
 	}
 
-	var file, openError = os.Open(blobPath)
-	if openError != nil {
-		return gophkeeper.Blob{}, openError
+	var (
+		iv       []byte
+		salt     []byte
+		location string
+		meta     string
+	)
+
+	var selectResourceResult = i.Connection.QueryRow(
+		ctx,
+		`SELECT (meta, 'resource') FROM resources WHERE id = $1 AND 'owner' = $2`,
+		(int64)(rid), i.Username,
+	)
+	var blobID int
+	if err := selectResourceResult.Scan(&meta, &blobID); err != nil {
+		return gophkeeper.Blob{}, err
 	}
-	key = pbkdf2.Key(([]byte)(password), salt, keyIter, keyLen, sha256.New)
-	var block, blockError = aes.NewCipher(key)
+	var selectBlobResult = i.Connection.QueryRow(
+		ctx,
+		`SELECT ('location', iv, salt) FROM blobs WHERE id = $1`,
+		blobID,
+	)
+	if err := selectBlobResult.Scan(&location, &iv, &salt); err != nil {
+		return gophkeeper.Blob{}, err
+	}
+
+	var file, fileError = os.Open(location)
+	if fileError != nil {
+		return gophkeeper.Blob{}, fileError
+	}
+	var block, blockError = aes.NewCipher(
+		pbkdf2.Key(([]byte)(password), salt, keyIter, keyLen, sha256.New),
+	)
 	if blockError != nil {
 		return gophkeeper.Blob{}, blockError
 	}
@@ -230,13 +290,85 @@ func (i *Identity) RestoreBlob(ctx context.Context, rid gophkeeper.ResourceID, p
 }
 
 // Delete implements Identity.
-func (i *Identity) Delete(context.Context, gophkeeper.ResourceID) error {
-	panic("unimplemented")
+func (i *Identity) Delete(ctx context.Context, rid gophkeeper.ResourceID) error {
+	var transaction, transactionError = i.Connection.Begin(ctx)
+	if transactionError != nil {
+		return transactionError
+	}
+	defer transaction.Rollback(context.Background())
+
+	var deleteResourceResult = transaction.QueryRow(
+		ctx,
+		`DELETE FROM resources WHERE id = $1 AND 'owner' = $2 RETURNING ('type', 'resource')`,
+		(int64)(rid), i.Username,
+	)
+	var (
+		resourceType int
+		resourceID   int
+	)
+	if err := deleteResourceResult.Scan(&resourceType, &resourceID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return gophkeeper.ErrResourceNotFound
+		}
+		return err
+	}
+
+	switch (gophkeeper.ResourceType)(resourceType) {
+	case gophkeeper.ResourceTypePiece:
+		_, err := transaction.Exec(
+			ctx,
+			`DELETE FROM pieces WHERE id = $1`,
+			resourceID,
+		)
+		if err != nil {
+			return err
+		}
+	case gophkeeper.ResourceTypeBlob:
+		var deleteResult = transaction.QueryRow(
+			ctx,
+			`DELETE FROM blobs WHERE id = $1 RETURNING 'location'`,
+			resourceID,
+		)
+		var location string
+		if err := deleteResult.Scan(&location); err != nil {
+			return err
+		}
+		if err := os.Remove(location); err != nil {
+			return err
+		}
+	default:
+		log.Fatalf("unknown resource type: %d", resourceType)
+	}
+
+	if err := transaction.Commit(ctx); err != nil {
+		return err
+	}
+	return nil
 }
 
 // List implements Identity.
-func (i *Identity) List(context.Context) ([]gophkeeper.Resource, error) {
-	panic("unimplemented")
+func (i *Identity) List(ctx context.Context) ([]gophkeeper.Resource, error) {
+	var selectResourcesResult, selectResourcesResultError = i.Connection.Query(
+		ctx,
+		`SELECT (id, 'type', 'meta') FROM resources WHERE 'owner' = $1`,
+		i.Username,
+	)
+	if selectResourcesResultError != nil {
+		return nil, selectResourcesResultError
+	}
+	defer selectResourcesResult.Close()
+	var resources []gophkeeper.Resource
+	for selectResourcesResult.Next() {
+		if err := selectResourcesResult.Err(); err != nil {
+			return nil, err
+		}
+		var resource gophkeeper.Resource
+		if err := selectResourcesResult.Scan(&resource.ID, &resource.Type, &resource.Meta); err != nil {
+			return nil, err
+		}
+		resources = append(resources, resource)
+	}
+	return resources, nil
 }
 
 func (i *Identity) comparePassword(ctx context.Context, password string) error {

@@ -1,24 +1,23 @@
-package blob
+package piece
 
 import (
-	"bufio"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/kerelape/gophkeeper/pkg/gophkeeper"
 )
 
-// Entry is blob entry.
+// Entry is piece entry.
 type Entry struct {
-	Repository gophkeeper.Gophkeeper
+	Gophkeeper gophkeeper.Gophkeeper
 }
 
-// Route routes blob entry.
+// Route routes piece entry.
 func (e *Entry) Route() http.Handler {
 	var router = chi.NewRouter()
 	router.Put("/", e.encrypt)
@@ -28,7 +27,7 @@ func (e *Entry) Route() http.Handler {
 
 func (e *Entry) encrypt(out http.ResponseWriter, in *http.Request) {
 	var token = in.Header.Get("Authorization")
-	var identity, identityError = e.Repository.Identity(in.Context(), (gophkeeper.Token)(token))
+	var identity, identityError = e.Gophkeeper.Identity(in.Context(), (gophkeeper.Token)(token))
 	if identityError != nil {
 		var status = http.StatusInternalServerError
 		if errors.Is(identityError, gophkeeper.ErrBadCredential) {
@@ -38,18 +37,25 @@ func (e *Entry) encrypt(out http.ResponseWriter, in *http.Request) {
 		return
 	}
 
-	var body = bufio.NewReader(in.Body)
-	var meta, metaError = body.ReadString('\n')
-	if metaError != nil {
+	var request struct {
+		Meta    string `json:"meta"`
+		Content string `json:"content"`
+	}
+	if err := json.NewDecoder(in.Body).Decode(&request); err != nil {
 		var status = http.StatusBadRequest
 		http.Error(out, http.StatusText(status), status)
 		return
 	}
-	meta = strings.TrimSuffix(meta, "\n")
+	var content []byte
+	if _, err := base64.RawStdEncoding.Decode(content, ([]byte)(request.Content)); err != nil {
+		var status = http.StatusBadRequest
+		http.Error(out, http.StatusText(status), status)
+		return
+	}
 
-	var blob = gophkeeper.Blob{
-		Meta:    meta,
-		Content: in.Body,
+	var piece = gophkeeper.Piece{
+		Meta:    request.Meta,
+		Content: content,
 	}
 	var password = in.Header.Get("X-Password")
 	if password == "" {
@@ -57,9 +63,12 @@ func (e *Entry) encrypt(out http.ResponseWriter, in *http.Request) {
 		http.Error(out, http.StatusText(status), status)
 		return
 	}
-	rid, storeError := identity.StoreBlob(in.Context(), blob, password)
+	var rid, storeError = identity.StorePiece(in.Context(), piece, password)
 	if storeError != nil {
 		var status = http.StatusInternalServerError
+		if errors.Is(identityError, gophkeeper.ErrBadCredential) {
+			status = http.StatusUnauthorized
+		}
 		http.Error(out, http.StatusText(status), status)
 		return
 	}
@@ -76,7 +85,7 @@ func (e *Entry) encrypt(out http.ResponseWriter, in *http.Request) {
 
 func (e *Entry) decrypt(out http.ResponseWriter, in *http.Request) {
 	var token = in.Header.Get("Authorization")
-	var identity, identityError = e.Repository.Identity(in.Context(), (gophkeeper.Token)(token))
+	var identity, identityError = e.Gophkeeper.Identity(in.Context(), (gophkeeper.Token)(token))
 	if identityError != nil {
 		var status = http.StatusInternalServerError
 		if errors.Is(identityError, gophkeeper.ErrBadCredential) {
@@ -86,6 +95,12 @@ func (e *Entry) decrypt(out http.ResponseWriter, in *http.Request) {
 		return
 	}
 
+	var password = in.Header.Get("X-Password")
+	if password == "" {
+		var status = http.StatusUnauthorized
+		http.Error(out, http.StatusText(status), status)
+		return
+	}
 	var rid, ridError = strconv.Atoi(chi.URLParam(in, "rid"))
 	if ridError != nil {
 		var status = http.StatusBadRequest
@@ -93,16 +108,7 @@ func (e *Entry) decrypt(out http.ResponseWriter, in *http.Request) {
 		return
 	}
 
-	var request struct {
-		Password string `json:"password"`
-	}
-	if err := json.NewDecoder(in.Body).Decode(&request); err != nil {
-		var status = http.StatusBadRequest
-		http.Error(out, http.StatusText(status), status)
-		return
-	}
-
-	var blob, restoreError = identity.RestoreBlob(in.Context(), (gophkeeper.ResourceID)(rid), request.Password)
+	var piece, restoreError = identity.RestorePiece(in.Context(), (gophkeeper.ResourceID)(rid), password)
 	if restoreError != nil {
 		var status = http.StatusInternalServerError
 		if errors.Is(identityError, gophkeeper.ErrBadCredential) {
@@ -112,19 +118,14 @@ func (e *Entry) decrypt(out http.ResponseWriter, in *http.Request) {
 		return
 	}
 
+	var response struct {
+		Meta    string `json:"meta"`
+		Content string `json:"content"`
+	}
+	response.Meta = piece.Meta
+	response.Content = base64.RawStdEncoding.EncodeToString(piece.Content)
 	out.WriteHeader(http.StatusOK)
-
-	var output = bufio.NewWriter(out)
-	if _, err := output.WriteString(blob.Meta); err != nil {
-		log.Printf("failed to write meta: %s", err.Error())
-	}
-	if err := output.WriteByte(0x00); err != nil {
-		log.Printf("failed to write meta delimiter: %s", err.Error())
-	}
-	if err := output.Flush(); err != nil {
-		log.Printf("failed to flush meta: %s", err.Error())
-	}
-	if _, err := output.ReadFrom(blob.Content); err != nil {
-		log.Printf("failed to write content: %s", err.Error())
+	if err := json.NewEncoder(out).Encode(response); err != nil {
+		log.Printf("Failed to write response: %s", err.Error())
 	}
 }

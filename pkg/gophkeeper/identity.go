@@ -40,6 +40,7 @@ const (
 type Resource struct {
 	ID   ResourceID
 	Type ResourceType
+	Meta string
 }
 
 var (

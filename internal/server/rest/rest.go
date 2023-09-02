@@ -24,7 +24,7 @@ var _ runnable.Runnable = (*Rest)(nil)
 func (r *Rest) Run(ctx context.Context) error {
 	var (
 		entry = Entry{
-			Repository: r.Repository,
+			Gophkeeper: r.Repository,
 		}
 		server = http.Server{
 			Addr:    r.Address,
