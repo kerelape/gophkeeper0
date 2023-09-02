@@ -61,40 +61,67 @@ func (i *Identity) StorePiece(ctx context.Context, piece gophkeeper.Piece, passw
 	}
 	var content = aesgcm.Seal(nil, iv, piece.Content, nil)
 
-	result := i.Connection.QueryRow(
+	var transaction, transactionError = i.Connection.Begin(ctx)
+	if transactionError != nil {
+		return -1, transactionError
+	}
+	defer transaction.Rollback(context.Background())
+
+	insertPieceResult := transaction.QueryRow(
 		ctx,
-		`INSERT INTO pieces(owner, meta, content, salt, iv) VALUES($1, $2, $3, $4, $5) RETURNING rid`,
-		i.Username,
-		piece.Meta, content,
-		salt, iv,
+		`INSERT INTO pieces(content, salt, iv) VALUES($1, $2, $3) RETURNING id`,
+		content, salt, iv,
 	)
-	var rid int64
-	if err := result.Scan(&rid); err != nil {
+	var id int
+	if err := insertPieceResult.Scan(&id); err != nil {
 		return -1, err
 	}
+	insertResourceResult := transaction.QueryRow(
+		ctx,
+		`INSERT INTO resources(meta, resource, type) VALUES($1, $2, $3) RETURNING id`,
+		piece.Meta, id, (int)(gophkeeper.ResourceTypePiece),
+	)
+	var rid int64
+	if err := insertResourceResult.Scan(&rid); err != nil {
+		return -1, err
+	}
+	if err := transaction.Commit(ctx); err != nil {
+		return -1, err
+	}
+
 	return (gophkeeper.ResourceID)(rid), nil
 }
 
 // RestorePiece implements Identity.
 func (i *Identity) RestorePiece(ctx context.Context, rid gophkeeper.ResourceID, password string) (gophkeeper.Piece, error) {
 	var (
-		owner   string
 		meta    string
 		content []byte
 		iv      []byte
 		salt    []byte
 	)
-	var result = i.Connection.QueryRow(
+
+	var queryResourceResult = i.Connection.QueryRow(
 		ctx,
-		`SELECT (owner, meta, content, iv, salt) FROM pieces WHERE rid = $1`,
-		(int64)(rid),
+		`SELECT (meta, resource) FROM resources WHERE id = $1 AND owner = $2 AND type = $3`,
+		(int64)(rid), i.Username, (int)(gophkeeper.ResourceTypePiece),
 	)
-	if err := result.Scan(&owner, &meta, &content, &iv, &salt); err != nil {
+	var id int
+	if err := queryResourceResult.Scan(&meta, &id); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return gophkeeper.Piece{}, gophkeeper.ErrResourceNotFound
 		}
 		return gophkeeper.Piece{}, err
 	}
+	var queryPieceResult = i.Connection.QueryRow(
+		ctx,
+		`SELECT (content, iv, salt) FROM pieces WHERE id = $1`,
+		id,
+	)
+	if err := queryPieceResult.Scan(&content, &iv, &salt); err != nil {
+		return gophkeeper.Piece{}, err
+	}
+
 	var key = pbkdf2.Key(([]byte)(password), salt, keyIter, keyLen, sha256.New)
 	var block, blockError = aes.NewCipher(key)
 	if blockError != nil {
@@ -108,6 +135,7 @@ func (i *Identity) RestorePiece(ctx context.Context, rid gophkeeper.ResourceID, 
 	if openError != nil {
 		return gophkeeper.Piece{}, openError
 	}
+
 	var piece = gophkeeper.Piece{
 		Meta:    meta,
 		Content: decryptedContent,
