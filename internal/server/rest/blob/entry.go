@@ -60,6 +60,9 @@ func (e *Entry) encrypt(out http.ResponseWriter, in *http.Request) {
 	rid, storeError := identity.StoreBlob(in.Context(), blob, password)
 	if storeError != nil {
 		var status = http.StatusInternalServerError
+		if errors.Is(storeError, gophkeeper.ErrBadCredential) {
+			status = http.StatusUnauthorized
+		}
 		http.Error(out, http.StatusText(status), status)
 		return
 	}
