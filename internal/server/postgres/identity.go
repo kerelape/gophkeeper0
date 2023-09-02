@@ -275,8 +275,60 @@ func (i *Identity) RestoreBlob(ctx context.Context, rid gophkeeper.ResourceID, p
 }
 
 // Delete implements Identity.
-func (i *Identity) Delete(context.Context, gophkeeper.ResourceID) error {
-	panic("unimplemented")
+func (i *Identity) Delete(ctx context.Context, rid gophkeeper.ResourceID) error {
+	var transaction, transactionError = i.Connection.Begin(ctx)
+	if transactionError != nil {
+		return transactionError
+	}
+	defer transaction.Rollback(context.Background())
+
+	var deleteResourceResult = transaction.QueryRow(
+		ctx,
+		`DELETE FROM resources WHERE id = $1 AND 'owner' = $2 RETURNING ('type', 'resource')`,
+		(int64)(rid), i.Username,
+	)
+	var (
+		resourceType int
+		resourceID   int
+	)
+	if err := deleteResourceResult.Scan(&resourceType, &resourceID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return gophkeeper.ErrResourceNotFound
+		}
+		return err
+	}
+
+	switch (gophkeeper.ResourceType)(resourceType) {
+	case gophkeeper.ResourceTypePiece:
+		_, err := transaction.Exec(
+			ctx,
+			`DELETE FROM pieces WHERE id = $1`,
+			resourceID,
+		)
+		if err != nil {
+			return err
+		}
+	case gophkeeper.ResourceTypeBlob:
+		var deleteResult = transaction.QueryRow(
+			ctx,
+			`DELETE FROM blobs WHERE id = $1 RETURNING 'location'`,
+			resourceID,
+		)
+		var location string
+		if err := deleteResult.Scan(&location); err != nil {
+			return err
+		}
+		if err := os.Remove(location); err != nil {
+			return err
+		}
+	default:
+		log.Fatalf("unknown resource type: %d", resourceType)
+	}
+
+	if err := transaction.Commit(ctx); err != nil {
+		return err
+	}
+	return nil
 }
 
 // List implements Identity.
