@@ -40,6 +40,10 @@ var _ gophkeeper.Identity = (*Identity)(nil)
 
 // StorePiece implements Identity.
 func (i *Identity) StorePiece(ctx context.Context, piece gophkeeper.Piece, password string) (gophkeeper.ResourceID, error) {
+	if err := i.comparePassword(ctx, password); err != nil {
+		return -1, errors.Join(err, gophkeeper.ErrBadCredential)
+	}
+
 	var (
 		salt []byte = make([]byte, 8)
 		iv   []byte = make([]byte, keyLen)
@@ -95,6 +99,10 @@ func (i *Identity) StorePiece(ctx context.Context, piece gophkeeper.Piece, passw
 
 // RestorePiece implements Identity.
 func (i *Identity) RestorePiece(ctx context.Context, rid gophkeeper.ResourceID, password string) (gophkeeper.Piece, error) {
+	if err := i.comparePassword(ctx, password); err != nil {
+		return gophkeeper.Piece{}, errors.Join(err, gophkeeper.ErrBadCredential)
+	}
+
 	var (
 		meta    string
 		content []byte
@@ -147,6 +155,9 @@ func (i *Identity) RestorePiece(ctx context.Context, rid gophkeeper.ResourceID, 
 // StoreBlob implements Identity.
 func (i *Identity) StoreBlob(ctx context.Context, blob gophkeeper.Blob, password string) (gophkeeper.ResourceID, error) {
 	defer blob.Content.Close()
+	if err := i.comparePassword(ctx, password); err != nil {
+		return -1, errors.Join(err, gophkeeper.ErrBadCredential)
+	}
 
 	var (
 		salt []byte = make([]byte, 8)
@@ -226,6 +237,10 @@ func (i *Identity) StoreBlob(ctx context.Context, blob gophkeeper.Blob, password
 
 // RestoreBlob implements Identity.
 func (i *Identity) RestoreBlob(ctx context.Context, rid gophkeeper.ResourceID, password string) (gophkeeper.Blob, error) {
+	if err := i.comparePassword(ctx, password); err != nil {
+		return gophkeeper.Blob{}, errors.Join(err, gophkeeper.ErrBadCredential)
+	}
+
 	var (
 		iv       []byte
 		salt     []byte
