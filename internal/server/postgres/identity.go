@@ -9,13 +9,13 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
-	"io"
 	"os"
 	"path"
 	"strconv"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	composedreadcloser "github.com/kerelape/gophkeeper/internal/composed_read_closer"
 	"github.com/kerelape/gophkeeper/pkg/gophkeeper"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/crypto/pbkdf2"
@@ -218,12 +218,12 @@ func (i *Identity) RestoreBlob(ctx context.Context, rid gophkeeper.ResourceID, p
 	}
 	var blob = gophkeeper.Blob{
 		Meta: meta,
-		Content: &readCloser{
-			reader: cipher.StreamReader{
+		Content: &composedreadcloser.ComposedReadCloser{
+			Reader: cipher.StreamReader{
 				S: cipher.NewCTR(block, iv),
 				R: file,
 			},
-			closer: file,
+			Closer: file,
 		},
 	}
 	return blob, nil
@@ -262,17 +262,4 @@ func (i *Identity) comparePassword(ctx context.Context, password string) error {
 		return errors.Join(gophkeeper.ErrBadCredential, err)
 	}
 	return nil
-}
-
-type readCloser struct {
-	reader io.Reader
-	closer io.Closer
-}
-
-func (rc *readCloser) Read(p []byte) (int, error) {
-	return rc.reader.Read(p)
-}
-
-func (rc *readCloser) Close() error {
-	return rc.closer.Close()
 }

@@ -8,7 +8,14 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
+
+	composedreadcloser "github.com/kerelape/gophkeeper/internal/composed_read_closer"
+	sequencereader "github.com/kerelape/gophkeeper/internal/sequence_reader"
 )
+
+// ErrServerIsDown is returns when server returned an internal server error.
+var ErrServerIsDown = errors.New("server is down")
 
 // RestIdentity is rest identity.
 type RestIdentity struct {
@@ -63,6 +70,8 @@ func (i *RestIdentity) StorePiece(ctx context.Context, piece Piece, password str
 		)
 	case http.StatusUnauthorized:
 		return -1, ErrBadCredential
+	case http.StatusInternalServerError:
+		return -1, ErrServerIsDown
 	default:
 		return -1, errors.Join(
 			fmt.Errorf("unexpected response status: %d", response.StatusCode),
@@ -131,6 +140,8 @@ func (i *RestIdentity) RestorePiece(ctx context.Context, rid ResourceID, passwor
 		return piece, nil
 	case http.StatusUnauthorized:
 		return Piece{}, ErrBadCredential
+	case http.StatusInternalServerError:
+		return Piece{}, ErrServerIsDown
 	default:
 		return Piece{}, errors.Join(
 			fmt.Errorf("unexpected response status: %d", response.StatusCode),
@@ -140,10 +151,62 @@ func (i *RestIdentity) RestorePiece(ctx context.Context, rid ResourceID, passwor
 }
 
 // StoreBlob implements Identity.
-//
-// @todo #31 Implement StoreBlob on RestIdentity.
 func (i *RestIdentity) StoreBlob(ctx context.Context, blob Blob, password string) (ResourceID, error) {
-	panic("unimplemented")
+	var (
+		endpoint = fmt.Sprintf("%s/blob", i.Server)
+		header   = fmt.Sprintf("%s\n%s\n", password, blob.Meta)
+	)
+
+	var request, requestError = http.NewRequestWithContext(
+		ctx,
+		http.MethodPut, endpoint,
+		&composedreadcloser.ComposedReadCloser{
+			Reader: &sequencereader.SequenceReader{
+				strings.NewReader(header),
+				blob.Content,
+			},
+			Closer: blob.Content,
+		},
+	)
+	if requestError != nil {
+		return -1, requestError
+	}
+	request.Header.Set("Authorization", (string)(i.Token))
+
+	response, responseError := i.Client.Do(request)
+	if responseError != nil {
+		return -1, responseError
+	}
+
+	switch response.StatusCode {
+	case http.StatusCreated:
+		var content = make(map[string]any)
+		if err := json.NewDecoder(response.Body).Decode(&content); err != nil {
+			return -1, errors.Join(
+				fmt.Errorf("parse response: %w", err),
+				ErrIncompatibleAPI,
+			)
+		}
+		var rid ResourceID
+		if value, ok := content["value"].(int64); ok {
+			rid = (ResourceID)(value)
+		} else {
+			return -1, errors.Join(
+				fmt.Errorf("invalid response body"),
+				ErrIncompatibleAPI,
+			)
+		}
+		return rid, nil
+	case http.StatusUnauthorized:
+		return -1, ErrBadCredential
+	case http.StatusInternalServerError:
+		return -1, ErrServerIsDown
+	default:
+		return -1, errors.Join(
+			fmt.Errorf("unexpected response status: %d", response.StatusCode),
+			ErrIncompatibleAPI,
+		)
+	}
 }
 
 // RestoreBlob implements Identity.
