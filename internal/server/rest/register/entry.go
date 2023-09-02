@@ -11,7 +11,7 @@ import (
 
 // Entry is login entry.
 type Entry struct {
-	Repository gophkeeper.Gophkeeper
+	Gophkeeper gophkeeper.Gophkeeper
 }
 
 // Route routes login entry.
@@ -46,7 +46,7 @@ func (e *Entry) post(out http.ResponseWriter, in *http.Request) {
 		return
 	}
 
-	if err := e.Repository.Register(in.Context(), credential); err != nil {
+	if err := e.Gophkeeper.Register(in.Context(), credential); err != nil {
 		var status = http.StatusInternalServerError
 		if errors.Is(err, gophkeeper.ErrBadCredential) {
 			status = http.StatusBadRequest
