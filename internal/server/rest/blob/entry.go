@@ -39,25 +39,23 @@ func (e *Entry) encrypt(out http.ResponseWriter, in *http.Request) {
 	}
 
 	var body = bufio.NewReader(in.Body)
-	var password, passwordError = body.ReadString(0x00)
-	if passwordError != nil {
-		var status = http.StatusBadRequest
-		http.Error(out, http.StatusText(status), status)
-		return
-	}
-	password, _ = strings.CutSuffix(password, (string)(0x00))
-
-	var meta, metaError = body.ReadString(0x00)
+	var meta, metaError = body.ReadString('\n')
 	if metaError != nil {
 		var status = http.StatusBadRequest
 		http.Error(out, http.StatusText(status), status)
 		return
 	}
-	meta, _ = strings.CutSuffix(meta, (string)(0x00))
+	meta = strings.TrimSuffix(meta, "\n")
 
 	var blob = gophkeeper.Blob{
 		Meta:    meta,
 		Content: in.Body,
+	}
+	var password = in.Header.Get("X-Password")
+	if password == "" {
+		var status = http.StatusUnauthorized
+		http.Error(out, http.StatusText(status), status)
+		return
 	}
 	rid, storeError := identity.StoreBlob(in.Context(), blob, password)
 	if storeError != nil {

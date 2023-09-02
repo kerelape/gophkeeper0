@@ -38,9 +38,8 @@ func (e *Entry) encrypt(out http.ResponseWriter, in *http.Request) {
 	}
 
 	var request struct {
-		Meta     string `json:"meta"`
-		Content  string `json:"content"`
-		Password string `json:"password"`
+		Meta    string `json:"meta"`
+		Content string `json:"content"`
 	}
 	if err := json.NewDecoder(in.Body).Decode(&request); err != nil {
 		var status = http.StatusBadRequest
@@ -58,7 +57,13 @@ func (e *Entry) encrypt(out http.ResponseWriter, in *http.Request) {
 		Meta:    request.Meta,
 		Content: content,
 	}
-	var rid, storeError = identity.StorePiece(in.Context(), piece, request.Password)
+	var password = in.Header.Get("X-Password")
+	if password == "" {
+		var status = http.StatusUnauthorized
+		http.Error(out, http.StatusText(status), status)
+		return
+	}
+	var rid, storeError = identity.StorePiece(in.Context(), piece, password)
 	if storeError != nil {
 		var status = http.StatusInternalServerError
 		if errors.Is(identityError, gophkeeper.ErrBadCredential) {
@@ -90,11 +95,9 @@ func (e *Entry) decrypt(out http.ResponseWriter, in *http.Request) {
 		return
 	}
 
-	var request struct {
-		Password string `json:"password"`
-	}
-	if err := json.NewDecoder(in.Body).Decode(&request); err != nil {
-		var status = http.StatusBadRequest
+	var password = in.Header.Get("X-Password")
+	if password == "" {
+		var status = http.StatusUnauthorized
 		http.Error(out, http.StatusText(status), status)
 		return
 	}
@@ -105,7 +108,7 @@ func (e *Entry) decrypt(out http.ResponseWriter, in *http.Request) {
 		return
 	}
 
-	var piece, restoreError = identity.RestorePiece(in.Context(), (gophkeeper.ResourceID)(rid), request.Password)
+	var piece, restoreError = identity.RestorePiece(in.Context(), (gophkeeper.ResourceID)(rid), password)
 	if restoreError != nil {
 		var status = http.StatusInternalServerError
 		if errors.Is(identityError, gophkeeper.ErrBadCredential) {
