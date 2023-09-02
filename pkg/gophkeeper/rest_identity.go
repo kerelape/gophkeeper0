@@ -32,9 +32,8 @@ func (i *RestIdentity) StorePiece(ctx context.Context, piece Piece, password str
 	var endpoint = fmt.Sprintf("%s/piece", i.Server)
 	var content, contentError = json.Marshal(
 		map[string]any{
-			"meta":     piece.Meta,
-			"content":  base64.RawStdEncoding.EncodeToString(([]byte)(piece.Content)),
-			"password": password,
+			"meta":    piece.Meta,
+			"content": base64.RawStdEncoding.EncodeToString(([]byte)(piece.Content)),
 		},
 	)
 	if contentError != nil {
@@ -49,6 +48,8 @@ func (i *RestIdentity) StorePiece(ctx context.Context, piece Piece, password str
 		return -1, requestError
 	}
 	request.Header.Set("Authorization", (string)(i.Token))
+	request.Header.Set("X-Password", password)
+
 	var response, responseError = i.Client.Do(request)
 	if responseError != nil {
 		return -1, responseError
@@ -84,23 +85,17 @@ func (i *RestIdentity) StorePiece(ctx context.Context, piece Piece, password str
 // RestorePiece implements Identity.
 func (i *RestIdentity) RestorePiece(ctx context.Context, rid ResourceID, password string) (Piece, error) {
 	var endpoint = fmt.Sprintf("%s/piece/%d", i.Server, rid)
-	var content, contentError = json.Marshal(
-		map[string]any{
-			"password": password,
-		},
-	)
-	if contentError != nil {
-		return Piece{}, contentError
-	}
 	var request, requestError = http.NewRequestWithContext(
 		ctx,
 		http.MethodGet, endpoint,
-		bytes.NewReader(content),
+		nil,
 	)
 	if requestError != nil {
 		return Piece{}, requestError
 	}
 	request.Header.Set("Authorization", (string)(i.Token))
+	request.Header.Set("X-Password", password)
+
 	var response, responseError = i.Client.Do(request)
 	if responseError != nil {
 		return Piece{}, responseError
@@ -155,7 +150,7 @@ func (i *RestIdentity) RestorePiece(ctx context.Context, rid ResourceID, passwor
 func (i *RestIdentity) StoreBlob(ctx context.Context, blob Blob, password string) (ResourceID, error) {
 	var (
 		endpoint = fmt.Sprintf("%s/blob", i.Server)
-		header   = fmt.Sprintf("%s\n%s\n", password, blob.Meta)
+		header   = fmt.Sprintf("%s\n", blob.Meta)
 	)
 
 	var request, requestError = http.NewRequestWithContext(
@@ -173,6 +168,7 @@ func (i *RestIdentity) StoreBlob(ctx context.Context, blob Blob, password string
 		return -1, requestError
 	}
 	request.Header.Set("Authorization", (string)(i.Token))
+	request.Header.Set("X-Password", password)
 
 	response, responseError := i.Client.Do(request)
 	if responseError != nil {
@@ -222,7 +218,8 @@ func (i *RestIdentity) RestoreBlob(ctx context.Context, rid ResourceID, password
 		return Blob{}, requestError
 	}
 	request.Header.Set("Authorization", (string)(i.Token))
-	request.Header.Set("X-Password", password) // @todo #39 Move password to header
+	request.Header.Set("X-Password", password)
+
 	var response, responseError = i.Client.Do(request)
 	if responseError != nil {
 		return Blob{}, responseError
