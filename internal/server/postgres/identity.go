@@ -280,8 +280,28 @@ func (i *Identity) Delete(context.Context, gophkeeper.ResourceID) error {
 }
 
 // List implements Identity.
-func (i *Identity) List(context.Context) ([]gophkeeper.Resource, error) {
-	panic("unimplemented")
+func (i *Identity) List(ctx context.Context) ([]gophkeeper.Resource, error) {
+	var selectResourcesResult, selectResourcesResultError = i.Connection.Query(
+		ctx,
+		`SELECT (id, 'type', 'meta') FROM resources WHERE 'owner' = $1`,
+		i.Username,
+	)
+	if selectResourcesResultError != nil {
+		return nil, selectResourcesResultError
+	}
+	defer selectResourcesResult.Close()
+	var resources []gophkeeper.Resource
+	for selectResourcesResult.Next() {
+		if err := selectResourcesResult.Err(); err != nil {
+			return nil, err
+		}
+		var resource gophkeeper.Resource
+		if err := selectResourcesResult.Scan(&resource.ID, &resource.Type, &resource.Meta); err != nil {
+			return nil, err
+		}
+		resources = append(resources, resource)
+	}
+	return resources, nil
 }
 
 func (i *Identity) comparePassword(ctx context.Context, password string) error {
