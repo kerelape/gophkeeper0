@@ -222,7 +222,7 @@ func (i *RestIdentity) RestoreBlob(ctx context.Context, rid ResourceID, password
 		return Blob{}, requestError
 	}
 	request.Header.Set("Authorization", (string)(i.Token))
-	request.Header.Set("X-Password", password) // @todo Move password to header
+	request.Header.Set("X-Password", password) // @todo #39 Move password to header
 	var response, responseError = i.Client.Do(request)
 	if responseError != nil {
 		return Blob{}, responseError
