@@ -256,7 +256,7 @@ func (i *RestIdentity) RestoreBlob(ctx context.Context, rid ResourceID, password
 //
 // @todo #31 Implement Delete on RestIdentity.
 func (i *RestIdentity) Delete(context.Context, ResourceID) error {
-	panic("unimplemented")
+
 }
 
 // List implements Identity.
@@ -282,25 +282,37 @@ func (i *RestIdentity) List(ctx context.Context) ([]Resource, error) {
 		return nil, err
 	}
 
-	var resources = make([]Resource, len(responseContent))
-	for _, responseResource := range responseContent {
-		var resource Resource
-		if value, ok := responseResource["meta"].(string); ok {
-			resource.Meta = value
-		} else {
-			return nil, ErrIncompatibleAPI
+	switch response.StatusCode {
+	case http.StatusOK:
+		var resources = make([]Resource, len(responseContent))
+		for _, responseResource := range responseContent {
+			var resource Resource
+			if value, ok := responseResource["meta"].(string); ok {
+				resource.Meta = value
+			} else {
+				return nil, ErrIncompatibleAPI
+			}
+			if value, ok := responseResource["rid"].(int64); ok {
+				resource.ID = (ResourceID)(value)
+			} else {
+				return nil, ErrIncompatibleAPI
+			}
+			if value, ok := responseResource["type"].(int); ok {
+				resource.Type = (ResourceType)(value)
+			} else {
+				return nil, ErrIncompatibleAPI
+			}
+			resources = append(resources, resource)
 		}
-		if value, ok := responseResource["rid"].(int64); ok {
-			resource.ID = (ResourceID)(value)
-		} else {
-			return nil, ErrIncompatibleAPI
-		}
-		if value, ok := responseResource["type"].(int); ok {
-			resource.Type = (ResourceType)(value)
-		} else {
-			return nil, ErrIncompatibleAPI
-		}
-		resources = append(resources, resource)
+		return resources, nil
+	case http.StatusUnauthorized:
+		return nil, ErrBadCredential
+	case http.StatusInternalServerError:
+		return nil, ErrServerIsDown
+	default:
+		return nil, errors.Join(
+			fmt.Errorf("unexpected response code: %d", response.StatusCode),
+			ErrIncompatibleAPI,
+		)
 	}
-	return resources, nil
 }
