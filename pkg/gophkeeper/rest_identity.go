@@ -29,7 +29,7 @@ var _ Identity = (*RestIdentity)(nil)
 
 // StorePiece implements Identity.
 func (i *RestIdentity) StorePiece(ctx context.Context, piece Piece, password string) (ResourceID, error) {
-	var endpoint = fmt.Sprintf("%s/piece", i.Server)
+	var endpoint = fmt.Sprintf("%s/vault/piece", i.Server)
 	var content, contentError = json.Marshal(
 		map[string]any{
 			"meta":    piece.Meta,
@@ -84,7 +84,7 @@ func (i *RestIdentity) StorePiece(ctx context.Context, piece Piece, password str
 
 // RestorePiece implements Identity.
 func (i *RestIdentity) RestorePiece(ctx context.Context, rid ResourceID, password string) (Piece, error) {
-	var endpoint = fmt.Sprintf("%s/piece/%d", i.Server, rid)
+	var endpoint = fmt.Sprintf("%s/vault/piece/%d", i.Server, rid)
 	var request, requestError = http.NewRequestWithContext(
 		ctx,
 		http.MethodGet, endpoint,
@@ -149,7 +149,7 @@ func (i *RestIdentity) RestorePiece(ctx context.Context, rid ResourceID, passwor
 // StoreBlob implements Identity.
 func (i *RestIdentity) StoreBlob(ctx context.Context, blob Blob, password string) (ResourceID, error) {
 	var (
-		endpoint = fmt.Sprintf("%s/blob", i.Server)
+		endpoint = fmt.Sprintf("%s/vault/blob", i.Server)
 		header   = fmt.Sprintf("%s\n", blob.Meta)
 	)
 
@@ -208,7 +208,7 @@ func (i *RestIdentity) StoreBlob(ctx context.Context, blob Blob, password string
 
 // RestoreBlob implements Identity.
 func (i *RestIdentity) RestoreBlob(ctx context.Context, rid ResourceID, password string) (Blob, error) {
-	var endpoint = fmt.Sprintf("%s/blob/%d", i.Server, rid)
+	var endpoint = fmt.Sprintf("%s/vault/blob/%d", i.Server, rid)
 	var request, requestError = http.NewRequestWithContext(
 		ctx,
 		http.MethodGet, endpoint,
@@ -260,8 +260,47 @@ func (i *RestIdentity) Delete(context.Context, ResourceID) error {
 }
 
 // List implements Identity.
-//
-// @todo #31 Implement List on RestIdentity.
-func (i *RestIdentity) List(context.Context) ([]Resource, error) {
-	panic("unimplemented")
+func (i *RestIdentity) List(ctx context.Context) ([]Resource, error) {
+	var endpoint = fmt.Sprintf("%s/vault", i.Server)
+	var requeset, requestError = http.NewRequestWithContext(
+		ctx,
+		http.MethodGet, endpoint,
+		nil,
+	)
+	if requestError != nil {
+		return nil, requestError
+	}
+
+	var response, responseError = i.Client.Do(requeset)
+	if responseError != nil {
+		return nil, responseError
+	}
+	defer response.Body.Close()
+
+	var responseContent = make([](map[string]any), 0)
+	if err := json.NewDecoder(response.Body).Decode(&responseContent); err != nil {
+		return nil, err
+	}
+
+	var resources = make([]Resource, len(responseContent))
+	for _, responseResource := range responseContent {
+		var resource Resource
+		if value, ok := responseResource["meta"].(string); ok {
+			resource.Meta = value
+		} else {
+			return nil, ErrIncompatibleAPI
+		}
+		if value, ok := responseResource["rid"].(int64); ok {
+			resource.ID = (ResourceID)(value)
+		} else {
+			return nil, ErrIncompatibleAPI
+		}
+		if value, ok := responseResource["type"].(int); ok {
+			resource.Type = (ResourceType)(value)
+		} else {
+			return nil, ErrIncompatibleAPI
+		}
+		resources = append(resources, resource)
+	}
+	return resources, nil
 }
