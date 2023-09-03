@@ -253,16 +253,40 @@ func (i *RestIdentity) RestoreBlob(ctx context.Context, rid ResourceID, password
 }
 
 // Delete implements Identity.
-//
-// @todo #31 Implement Delete on RestIdentity.
-func (i *RestIdentity) Delete(context.Context, ResourceID) error {
+func (i *RestIdentity) Delete(ctx context.Context, rid ResourceID) error {
+	var endpoint = fmt.Sprintf("%s/vault/%d", i.Server, rid)
+	var request, requestError = http.NewRequestWithContext(
+		ctx,
+		http.MethodDelete, endpoint,
+		nil,
+	)
+	if requestError != nil {
+		return requestError
+	}
+	request.Header.Set("Authorization", (string)(i.Token))
 
+	response, responseError := i.Client.Do(request)
+	if responseError != nil {
+		return responseError
+	}
+
+	switch response.StatusCode {
+	case http.StatusOK:
+		return nil
+	case http.StatusInternalServerError:
+		return ErrServerIsDown
+	default:
+		return errors.Join(
+			fmt.Errorf("unexpected response code: %d", response.StatusCode),
+			ErrIncompatibleAPI,
+		)
+	}
 }
 
 // List implements Identity.
 func (i *RestIdentity) List(ctx context.Context) ([]Resource, error) {
 	var endpoint = fmt.Sprintf("%s/vault", i.Server)
-	var requeset, requestError = http.NewRequestWithContext(
+	var request, requestError = http.NewRequestWithContext(
 		ctx,
 		http.MethodGet, endpoint,
 		nil,
@@ -270,8 +294,9 @@ func (i *RestIdentity) List(ctx context.Context) ([]Resource, error) {
 	if requestError != nil {
 		return nil, requestError
 	}
+	request.Header.Set("Authorization", (string)(i.Token))
 
-	var response, responseError = i.Client.Do(requeset)
+	var response, responseError = i.Client.Do(request)
 	if responseError != nil {
 		return nil, responseError
 	}
