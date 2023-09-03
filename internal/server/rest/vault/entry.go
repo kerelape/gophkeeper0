@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/kerelape/gophkeeper/internal/server/rest/vault/blob"
@@ -72,7 +73,41 @@ func (e *Entry) get(out http.ResponseWriter, in *http.Request) {
 	}
 }
 
-// @todo #32 Implement `DELETE /vault/{rid}`
 func (e *Entry) delete(out http.ResponseWriter, in *http.Request) {
-	panic("unimplemented")
+	var token = in.Header.Get("Authorization")
+	var identity, identityError = e.Gophkeeper.Identity(in.Context(), (gophkeeper.Token)(token))
+	if identityError != nil {
+		var status = http.StatusInternalServerError
+		if errors.Is(identityError, gophkeeper.ErrBadCredential) {
+			status = http.StatusUnauthorized
+		}
+		http.Error(out, http.StatusText(status), status)
+		return
+	}
+
+	var rid gophkeeper.ResourceID
+	if value := chi.URLParam(in, "rid"); value != "" {
+		if value, err := strconv.Atoi(value); err != nil {
+			rid = (gophkeeper.ResourceID)(value)
+		} else {
+			var status = http.StatusBadRequest
+			http.Error(out, http.StatusText(status), status)
+			return
+		}
+	} else {
+		var status = http.StatusBadRequest
+		http.Error(out, http.StatusText(status), status)
+		return
+	}
+
+	if err := identity.Delete(in.Context(), rid); err != nil {
+		var status = http.StatusInternalServerError
+		if errors.Is(err, gophkeeper.ErrResourceNotFound) {
+			status = http.StatusNotFound
+		}
+		http.Error(out, http.StatusText(status), status)
+		return
+	}
+
+	out.WriteHeader(http.StatusOK)
 }
