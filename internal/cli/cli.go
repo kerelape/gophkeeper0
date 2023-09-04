@@ -2,7 +2,11 @@ package cli
 
 import (
 	"context"
+	"net/http"
 
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/kerelape/gophkeeper/internal/cli/application"
+	"github.com/kerelape/gophkeeper/pkg/gophkeeper"
 	"github.com/pior/runnable"
 )
 
@@ -14,8 +18,17 @@ type CLI struct {
 var _ runnable.Runnable = (*CLI)(nil)
 
 // Run implements runnable.Runnable.
-//
-// @todo #3 Implement CLI.
 func (c *CLI) Run(ctx context.Context) error {
-	panic("unimplemented")
+	var program = tea.NewProgram(
+		&application.Application{
+			Gophkeeper: &gophkeeper.RestGophkeeper{
+				Client: *http.DefaultClient,
+				Server: c.Server,
+			},
+		},
+	)
+	go program.Run()
+	<-ctx.Done()
+	program.Quit()
+	return nil
 }
