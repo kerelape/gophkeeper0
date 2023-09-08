@@ -14,9 +14,4 @@ func main() {
 	if server == nil {
 		log.Fatal("Missing -s flag")
 	}
-
-	var cli = &cli.CLI{
-		Server: *server,
-	}
-	runnable.Run(cli)
 }

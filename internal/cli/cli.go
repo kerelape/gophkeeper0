@@ -2,33 +2,32 @@ package cli
 
 import (
 	"context"
-	"net/http"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/kerelape/gophkeeper/internal/cli/application"
 	"github.com/kerelape/gophkeeper/pkg/gophkeeper"
 	"github.com/pior/runnable"
 )
 
 // CLI is gophkeeper command-line interface.
 type CLI struct {
-	Server string // Gophkeeper REST server address.
+	Gophkeeper  gophkeeper.Gophkeeper
+	CommandLine []string
 }
 
 var _ runnable.Runnable = (*CLI)(nil)
 
 // Run implements runnable.Runnable.
+//
+// @todo #3 Implement `register` command.
+// @todo #3 Implement `login` command.
+// @todo #3 Implement `list` command.
+// @todo #3 Implement `store-credential <description> <platform> <username> <password>` command.
+// @todo #3 Implement `store-file <description> <path>` command.
+// @todo #3 Implement `store-card <description> <cardholder> <number> <date> <cvv/cvc> command.
+// @todo #3 Implement `store-text <description> <content>` command.
+// @todo #3 Implement `restore-credential <rid>` command.
+// @todo #3 Implement `restore-file <rid>` command.
+// @todo #3 Implement `restore-card <rid>` command.
+// @todo #3 Implement `restore-text <rid>` command.
 func (c *CLI) Run(ctx context.Context) error {
-	var program = tea.NewProgram(
-		&application.Application{
-			Gophkeeper: &gophkeeper.RestGophkeeper{
-				Client: *http.DefaultClient,
-				Server: c.Server,
-			},
-		},
-	)
-	go program.Run()
-	<-ctx.Done()
-	program.Quit()
 	return nil
 }
