@@ -31,8 +31,8 @@ func (e *Entry) Route() http.Handler {
 	var router = chi.NewRouter()
 	router.Mount("/piece", piece.Route())
 	router.Mount("/blob", blob.Route())
-	router.Get("/", nil)
-	router.Delete("/{rid}", nil)
+	router.Get("/", e.get)
+	router.Delete("/{rid}", e.delete)
 	return router
 }
 
