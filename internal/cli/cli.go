@@ -23,7 +23,6 @@ var _ runnable.Runnable = (*CLI)(nil)
 // @todo #3 Implement `store-file <description> <path>` command.
 // @todo #3 Implement `store-card <description> <cardholder> <number> <date> <cvv/cvc> command.
 // @todo #3 Implement `store-text <description> <content>` command.
-// @todo #3 Implement `restore-credential <rid>` command.
 // @todo #3 Implement `restore-file <rid>` command.
 // @todo #3 Implement `restore-card <rid>` command.
 // @todo #3 Implement `restore-text <rid>` command.
@@ -36,6 +35,9 @@ func (c *CLI) Run(ctx context.Context) error {
 			gophkeeper: c.Gophkeeper,
 		},
 		"store-credential": &storeCredentialCommand{
+			gophkeeper: c.Gophkeeper,
+		},
+		"restore-credential": &restoreCredentialCommand{
 			gophkeeper: c.Gophkeeper,
 		},
 	}
