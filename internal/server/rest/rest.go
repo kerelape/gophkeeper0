@@ -7,13 +7,12 @@ import (
 
 	"github.com/kerelape/gophkeeper/pkg/gophkeeper"
 	"github.com/pior/runnable"
+	"golang.org/x/crypto/acme/autocert"
 )
 
 // Rest is gophkeeper's rest API.
 type Rest struct {
-	Address  string // Address is the address that REST api serves at.
-	CertFile string // CertFile is path to the cert file used for REST api.
-	KeyFile  string // KeyFile is path to the key file used for REST api.
+	Address string // Address is the address that REST api serves at.
 
 	Repository gophkeeper.Gophkeeper
 }
@@ -33,7 +32,7 @@ func (r *Rest) Run(ctx context.Context) error {
 		serverErrorChannel = make(chan error)
 	)
 	go func() {
-		serverErrorChannel <- server.ListenAndServeTLS(r.CertFile, r.KeyFile)
+		serverErrorChannel <- server.Serve(autocert.NewListener())
 	}()
 	select {
 	case <-ctx.Done():

@@ -23,7 +23,7 @@ func main() {
 	var application = cli.CLI{
 		Gophkeeper: &gophkeeper.RestGophkeeper{
 			Server: *server,
-			Client: *http.DefaultClient,
+			Client: http.Client{},
 		},
 		CommandLine: flag.Args(),
 	}

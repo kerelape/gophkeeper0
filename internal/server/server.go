@@ -10,9 +10,7 @@ import (
 
 // Server is gophkeeper server.
 type Server struct {
-	RestAddress  string // the address that REST api serves at.
-	RestCertFile string // path to the cert file used for REST api.
-	RestKeyFile  string // path to the key file used for REST api.
+	RestAddress string // the address that REST api serves at.
 
 	Repository gophkeeper.Gophkeeper
 }
@@ -24,8 +22,6 @@ func (s *Server) Run(ctx context.Context) error {
 	var (
 		restDaemon = rest.Rest{
 			Address:    s.RestAddress,
-			CertFile:   s.RestCertFile,
-			KeyFile:    s.RestKeyFile,
 			Repository: s.Repository,
 		}
 	)
