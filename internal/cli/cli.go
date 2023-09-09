@@ -20,8 +20,6 @@ var _ runnable.Runnable = (*CLI)(nil)
 
 // Run implements runnable.Runnable.
 //
-// @todo #3 Implement `login` command.
-// @todo #3 Implement `list` command.
 // @todo #3 Implement `store-credential <description> <platform> <username> <password>` command.
 // @todo #3 Implement `store-file <description> <path>` command.
 // @todo #3 Implement `store-card <description> <cardholder> <number> <date> <cvv/cvc> command.
@@ -33,6 +31,9 @@ var _ runnable.Runnable = (*CLI)(nil)
 func (c *CLI) Run(ctx context.Context) error {
 	var commands = map[string]command{
 		"register": &registerCommand{
+			gophkeeper: c.Gophkeeper,
+		},
+		"list": &listCommand{
 			gophkeeper: c.Gophkeeper,
 		},
 	}
