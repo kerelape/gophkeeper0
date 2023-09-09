@@ -20,7 +20,6 @@ var _ runnable.Runnable = (*CLI)(nil)
 
 // Run implements runnable.Runnable.
 //
-// @todo #3 Implement `store-credential <description> <platform> <username> <password>` command.
 // @todo #3 Implement `store-file <description> <path>` command.
 // @todo #3 Implement `store-card <description> <cardholder> <number> <date> <cvv/cvc> command.
 // @todo #3 Implement `store-text <description> <content>` command.
@@ -36,6 +35,9 @@ func (c *CLI) Run(ctx context.Context) error {
 		"list": &listCommand{
 			gophkeeper: c.Gophkeeper,
 		},
+		"store-credential": &storeCredentialCommand{
+			gophkeeper: c.Gophkeeper,
+		},
 	}
 	if len(c.CommandLine) < 1 {
 		return errors.New("command not specified")
@@ -43,7 +45,6 @@ func (c *CLI) Run(ctx context.Context) error {
 	if c.CommandLine[0] == "help" {
 		for n, c := range commands {
 			fmt.Printf("%s - %s\n", n, c.Description())
-			fmt.Printf("\t%s\n", c.Help())
 		}
 		return nil
 	}
@@ -53,7 +54,10 @@ func (c *CLI) Run(ctx context.Context) error {
 			println(command.Help())
 			return nil
 		}
-		return fmt.Errorf("failed to execute command %s: %w", c.CommandLine[0], err)
+		if err != nil {
+			return fmt.Errorf("failed to execute command %s: %w", c.CommandLine[0], err)
+		}
+		return nil
 	}
 	return errors.New("command not found")
 }

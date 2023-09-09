@@ -12,7 +12,11 @@ import (
 )
 
 func authenticate(ctx context.Context, g gophkeeper.Gophkeeper) (gophkeeper.Identity, error) {
-	var m, err = tea.NewProgram(newAuthenticationModel(), tea.WithAltScreen()).Run()
+	var m, err = tea.NewProgram(
+		newAuthenticationModel(),
+		tea.WithAltScreen(),
+		tea.WithContext(ctx),
+	).Run()
 	if err != nil {
 		return nil, err
 	}
