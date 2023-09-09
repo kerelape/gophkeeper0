@@ -48,7 +48,7 @@ func (g *RestGophkeeper) Register(ctx context.Context, credential Credential) er
 	switch response.StatusCode {
 	case http.StatusConflict:
 		return ErrIdentityDuplicate
-	case http.StatusOK:
+	case http.StatusCreated:
 		return nil
 	default:
 		return errors.Join(
