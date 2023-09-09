@@ -12,6 +12,8 @@ import (
 )
 
 func main() {
+	log.SetFlags(0)
+	log.SetPrefix("")
 	var server = flag.String("s", "", "Gophkeeper address")
 	flag.Parse()
 	if *server == "" {
@@ -23,8 +25,10 @@ func main() {
 			Server: *server,
 			Client: *http.DefaultClient,
 		},
+		CommandLine: flag.Args(),
 	}
 	if err := application.Run(context.Background()); err != nil {
+		log.Println()
 		log.Fatal(err)
 	}
 }
