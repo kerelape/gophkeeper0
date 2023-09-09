@@ -49,7 +49,14 @@ func (c *CLI) Run(ctx context.Context) error {
 		return nil
 	}
 	if command, ok := commands[c.CommandLine[0]]; ok {
-		correct, err := command.Execute(ctx, (stack.Stack[string])(c.CommandLine[1:]))
+		var (
+			input = (stack.Stack[string])(c.CommandLine[1:])
+			args  = make(stack.Stack[string], 0, len(input))
+		)
+		for len(input) > 0 {
+			args.Push(input.Pop())
+		}
+		correct, err := command.Execute(ctx, args)
 		if !correct {
 			println(command.Help())
 			return nil
