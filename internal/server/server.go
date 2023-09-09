@@ -10,9 +10,11 @@ import (
 
 // Server is gophkeeper server.
 type Server struct {
-	RestAddress string // the address that REST api serves at.
+	RestAddress       string // the address that REST api serves at.
+	RestUseTLS        bool
+	RestHostWhilelist []string
 
-	Repository gophkeeper.Gophkeeper
+	Gophkeeper gophkeeper.Gophkeeper
 }
 
 var _ runnable.Runnable = (*Server)(nil)
@@ -21,8 +23,10 @@ var _ runnable.Runnable = (*Server)(nil)
 func (s *Server) Run(ctx context.Context) error {
 	var (
 		restDaemon = rest.Rest{
-			Address:    s.RestAddress,
-			Repository: s.Repository,
+			Address:       s.RestAddress,
+			Gophkeeper:    s.Gophkeeper,
+			UseTLS:        s.RestUseTLS,
+			HostWhilelist: s.RestHostWhilelist,
 		}
 	)
 

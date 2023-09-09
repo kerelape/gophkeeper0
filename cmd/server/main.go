@@ -28,9 +28,11 @@ func main() {
 		log.Fatalf(wdError.Error())
 	}
 	var gophkeeper = server.Server{
-		RestAddress: configuration.Rest.Address,
+		RestAddress:       configuration.Rest.Address,
+		RestUseTLS:        configuration.Rest.UseTLS,
+		RestHostWhilelist: configuration.Rest.HostWhilelist,
 
-		Repository: &postgres.Gophkeeper{
+		Gophkeeper: &postgres.Gophkeeper{
 			PasswordEncoding: base64.RawStdEncoding,
 
 			DSN:      configuration.DatabaseDSN,
