@@ -56,9 +56,9 @@ func (r *restoreCredentialCommand) Execute(ctx context.Context, args stack.Stack
 	}
 
 	fmt.Printf("(%d) Credential\n", rid)
-	fmt.Printf("\n%s\n", resource.description)
+	fmt.Printf("\n%s\n\n", resource.description)
 	fmt.Printf("Username: %s\n", resource.username)
-	fmt.Printf("Password: %s\n", resource.password)
+	fmt.Printf("Password: %s\n\n", resource.password)
 
 	return true, nil
 }

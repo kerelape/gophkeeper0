@@ -1,6 +1,7 @@
 package piece
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -123,7 +124,13 @@ func (e *Entry) decrypt(out http.ResponseWriter, in *http.Request) {
 		Content string `json:"content"`
 	}
 	response.Meta = piece.Meta
-	response.Content = base64.RawStdEncoding.EncodeToString(piece.Content)
+	response.Content = base64.RawStdEncoding.EncodeToString(
+		bytes.ReplaceAll(
+			piece.Content,
+			[]byte{'\x00'},
+			[]byte{},
+		),
+	)
 	out.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(out).Encode(response); err != nil {
 		log.Printf("Failed to write response: %s", err.Error())

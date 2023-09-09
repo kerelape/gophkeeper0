@@ -97,7 +97,7 @@ func (i *RestIdentity) RestorePiece(ctx context.Context, rid ResourceID, passwor
 		return Piece{}, responseError
 	}
 	switch response.StatusCode {
-	case http.StatusCreated:
+	case http.StatusOK:
 		var content = make(map[string]any)
 		if err := json.NewDecoder(response.Body).Decode(&content); err != nil {
 			return Piece{}, errors.Join(

@@ -6,6 +6,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 func vaultPassword(ctx context.Context) (string, error) {
@@ -75,6 +76,6 @@ func (v vaultPasswordModel) View() string {
 	return form(
 		v.width, v.height,
 		"Vault",
-		v.password.View(),
+		lipgloss.NewStyle().Width(64).Render(v.password.View()),
 	)
 }

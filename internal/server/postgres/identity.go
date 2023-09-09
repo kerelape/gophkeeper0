@@ -112,7 +112,7 @@ func (i *Identity) RestorePiece(ctx context.Context, rid gophkeeper.ResourceID, 
 
 	var queryResourceResult = i.Connection.QueryRow(
 		ctx,
-		`SELECT (meta, 'resource') FROM resources WHERE id = $1 AND 'owner' = $2 AND 'type' = $3`,
+		`SELECT meta, resource FROM resources WHERE id = $1 AND owner = $2 AND type = $3`,
 		(int64)(rid), i.Username, (int)(gophkeeper.ResourceTypePiece),
 	)
 	var id int
@@ -124,7 +124,7 @@ func (i *Identity) RestorePiece(ctx context.Context, rid gophkeeper.ResourceID, 
 	}
 	var queryPieceResult = i.Connection.QueryRow(
 		ctx,
-		`SELECT (content, iv, salt) FROM pieces WHERE id = $1`,
+		`SELECT content, iv, salt FROM pieces WHERE id = $1`,
 		id,
 	)
 	if err := queryPieceResult.Scan(&content, &iv, &salt); err != nil {

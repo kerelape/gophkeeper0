@@ -46,7 +46,7 @@ func (c *CLI) Run(ctx context.Context) error {
 	}
 	if c.CommandLine[0] == "help" {
 		for n, c := range commands {
-			fmt.Printf("%s - %s\n", n, c.Description())
+			fmt.Printf("%s %s - %s\n", n, c.Help(), c.Description())
 		}
 		return nil
 	}
@@ -60,7 +60,7 @@ func (c *CLI) Run(ctx context.Context) error {
 		}
 		correct, err := command.Execute(ctx, args)
 		if !correct {
-			println(command.Help())
+			fmt.Printf("%s %s\n", c.CommandLine[0], command.Help())
 			return nil
 		}
 		if err != nil {
