@@ -50,20 +50,15 @@ func (i identity) List(ctx context.Context) ([]resource, error) {
 	for _, r := range resources {
 		var resource resource
 		resource.RID = r.ID
-		var meta map[string]any
+		var meta struct {
+			Type        resourceType `json:"type"`
+			Description string       `json:"description"`
+		}
 		if err := json.Unmarshal(([]byte)(r.Meta), &meta); err != nil {
 			continue
 		}
-		if value, ok := meta["type"].(int); ok {
-			resource.Type = (resourceType)(value)
-		} else {
-			continue
-		}
-		if value, ok := meta["description"].(string); ok {
-			resource.Description = value
-		} else {
-			continue
-		}
+		resource.Type = meta.Type
+		resource.Description = meta.Description
 		result = append(result, resource)
 	}
 	return result, nil

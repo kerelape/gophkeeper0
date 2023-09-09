@@ -46,7 +46,7 @@ func (i *Identity) StorePiece(ctx context.Context, piece gophkeeper.Piece, passw
 
 	var (
 		salt []byte = make([]byte, 8)
-		iv   []byte = make([]byte, keyLen)
+		iv   []byte = make([]byte, 12)
 		key  []byte
 	)
 	if _, err := rand.Read(salt); err != nil {
@@ -83,8 +83,8 @@ func (i *Identity) StorePiece(ctx context.Context, piece gophkeeper.Piece, passw
 	}
 	insertResourceResult := transaction.QueryRow(
 		ctx,
-		`INSERT INTO resources(meta, 'resource', 'type') VALUES($1, $2, $3) RETURNING id`,
-		piece.Meta, id, (int)(gophkeeper.ResourceTypePiece),
+		`INSERT INTO resources(meta, resource, type, owner) VALUES($1, $2, $3, $4) RETURNING id`,
+		piece.Meta, id, (int)(gophkeeper.ResourceTypePiece), i.Username,
 	)
 	var rid int64
 	if err := insertResourceResult.Scan(&rid); err != nil {
@@ -350,20 +350,23 @@ func (i *Identity) Delete(ctx context.Context, rid gophkeeper.ResourceID) error 
 func (i *Identity) List(ctx context.Context) ([]gophkeeper.Resource, error) {
 	var selectResourcesResult, selectResourcesResultError = i.Connection.Query(
 		ctx,
-		`SELECT (id, 'type', 'meta') FROM resources WHERE 'owner' = $1`,
+		`SELECT id, type, meta FROM resources WHERE owner = $1`,
 		i.Username,
 	)
 	if selectResourcesResultError != nil {
+		log.Fatal(selectResourcesResultError)
 		return nil, selectResourcesResultError
 	}
 	defer selectResourcesResult.Close()
 	var resources []gophkeeper.Resource
 	for selectResourcesResult.Next() {
 		if err := selectResourcesResult.Err(); err != nil {
+			log.Fatal(err)
 			return nil, err
 		}
 		var resource gophkeeper.Resource
 		if err := selectResourcesResult.Scan(&resource.ID, &resource.Type, &resource.Meta); err != nil {
+			log.Fatal(err)
 			return nil, err
 		}
 		resources = append(resources, resource)

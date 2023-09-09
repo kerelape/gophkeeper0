@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/kerelape/gophkeeper/internal/stack"
 	"github.com/kerelape/gophkeeper/pkg/gophkeeper"
@@ -43,7 +44,12 @@ func (l *listCommand) Execute(ctx context.Context, args stack.Stack[string]) (bo
 	}
 	fmt.Printf("%d resources found\n", len(resources))
 	for _, r := range resources {
-		fmt.Printf("(RID: %d)\n\tType: %s\n\tDescription: %s\n", r.RID, r.Type.String(), r.Description)
+		fmt.Printf(
+			"(RID: %d)\n\tType: %s\n\tDescription: %s\n",
+			r.RID,
+			r.Type.String(),
+			strings.ReplaceAll(r.Description, "\n", " "),
+		)
 	}
 	return true, nil
 }

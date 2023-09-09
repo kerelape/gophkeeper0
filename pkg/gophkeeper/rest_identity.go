@@ -56,20 +56,16 @@ func (i *RestIdentity) StorePiece(ctx context.Context, piece Piece, password str
 	}
 	switch response.StatusCode {
 	case http.StatusCreated:
-		var content = make(map[string]any)
+		var content struct {
+			RID ResourceID `json:"rid"`
+		}
 		if err := json.NewDecoder(response.Body).Decode(&content); err != nil {
 			return -1, errors.Join(
 				fmt.Errorf("parse response: %w", err),
 				ErrIncompatibleAPI,
 			)
 		}
-		if rid, ok := content["rid"].(int64); ok {
-			return (ResourceID)(rid), nil
-		}
-		return -1, errors.Join(
-			fmt.Errorf("invalid response"),
-			ErrIncompatibleAPI,
-		)
+		return content.RID, nil
 	case http.StatusUnauthorized:
 		return -1, ErrBadCredential
 	case http.StatusInternalServerError:
@@ -302,32 +298,29 @@ func (i *RestIdentity) List(ctx context.Context) ([]Resource, error) {
 	}
 	defer response.Body.Close()
 
-	var responseContent = make([](map[string]any), 0)
-	if err := json.NewDecoder(response.Body).Decode(&responseContent); err != nil {
-		return nil, err
-	}
-
 	switch response.StatusCode {
 	case http.StatusOK:
-		var resources = make([]Resource, len(responseContent))
+		var responseContent = make(
+			[]struct {
+				Meta string       `json:"meta"`
+				RID  ResourceID   `json:"rid"`
+				Type ResourceType `json:"type"`
+			},
+			0,
+		)
+		if err := json.NewDecoder(response.Body).Decode(&responseContent); err != nil {
+			return nil, err
+		}
+		var resources = make([]Resource, 0, len(responseContent))
 		for _, responseResource := range responseContent {
-			var resource Resource
-			if value, ok := responseResource["meta"].(string); ok {
-				resource.Meta = value
-			} else {
-				return nil, ErrIncompatibleAPI
-			}
-			if value, ok := responseResource["rid"].(int64); ok {
-				resource.ID = (ResourceID)(value)
-			} else {
-				return nil, ErrIncompatibleAPI
-			}
-			if value, ok := responseResource["type"].(int); ok {
-				resource.Type = (ResourceType)(value)
-			} else {
-				return nil, ErrIncompatibleAPI
-			}
-			resources = append(resources, resource)
+			resources = append(
+				resources,
+				Resource{
+					ID:   responseResource.RID,
+					Type: responseResource.Type,
+					Meta: responseResource.Meta,
+				},
+			)
 		}
 		return resources, nil
 	case http.StatusUnauthorized:

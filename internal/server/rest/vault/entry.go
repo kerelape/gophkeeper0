@@ -55,7 +55,7 @@ func (e *Entry) get(out http.ResponseWriter, in *http.Request) {
 		return
 	}
 
-	var response = make([](map[string]any), len(resources))
+	var response = make([](map[string]any), 0, len(resources))
 	for _, resource := range resources {
 		response = append(
 			response,

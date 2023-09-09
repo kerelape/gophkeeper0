@@ -46,7 +46,7 @@ func (e *Entry) encrypt(out http.ResponseWriter, in *http.Request) {
 		http.Error(out, http.StatusText(status), status)
 		return
 	}
-	var content []byte
+	var content = make([]byte, len(request.Content))
 	if _, err := base64.RawStdEncoding.Decode(content, ([]byte)(request.Content)); err != nil {
 		var status = http.StatusBadRequest
 		http.Error(out, http.StatusText(status), status)
@@ -78,7 +78,7 @@ func (e *Entry) encrypt(out http.ResponseWriter, in *http.Request) {
 		RID int64 `json:"rid"`
 	}
 	response.RID = (int64)(rid)
-	if err := json.NewEncoder(out).Encode(response); err != nil {
+	if err := json.NewEncoder(out).Encode(&response); err != nil {
 		log.Printf("Failed to write response: %s", err.Error())
 	}
 }
