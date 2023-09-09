@@ -8,7 +8,6 @@ import (
 
 	"github.com/kerelape/gophkeeper/cmd/server/config"
 	"github.com/kerelape/gophkeeper/internal/server"
-	"github.com/kerelape/gophkeeper/internal/server/postgres"
 	"github.com/pior/runnable"
 )
 
@@ -32,18 +31,14 @@ func main() {
 		RestUseTLS:        configuration.Rest.UseTLS,
 		RestHostWhilelist: configuration.Rest.HostWhilelist,
 
-		Gophkeeper: &postgres.Gophkeeper{
-			PasswordEncoding: base64.RawStdEncoding,
+		DatabaseDSN: configuration.DatabaseDSN,
+		BlobsDir:    path.Join(wd, "blobs"),
 
-			DSN:      configuration.DatabaseDSN,
-			BlobsDir: path.Join(wd, "blobs"),
+		TokenSecret:   secret,
+		TokenLifespan: configuration.Token.Lifespan,
 
-			TokenSecret:   secret,
-			TokenLifespan: configuration.Token.Lifespan,
-
-			UsernameMinLength: configuration.UsernameMinLength,
-			PasswordMinLength: configuration.PasswordMinLength,
-		},
+		UsernameMinLength: configuration.UsernameMinLength,
+		PasswordMinLength: configuration.PasswordMinLength,
 	}
 	runnable.Run(&gophkeeper)
 }

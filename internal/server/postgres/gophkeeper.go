@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	_ "embed"
 	"encoding/base64"
 	"errors"
 	"time"
@@ -15,7 +16,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// go:embed init.sql
+//go:embed init.sql
 var initQuery string
 
 // Gophkeeper is a postgresql identity repository.
