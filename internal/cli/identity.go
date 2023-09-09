@@ -68,3 +68,33 @@ func (i identity) List(ctx context.Context) ([]resource, error) {
 	}
 	return result, nil
 }
+
+func (i identity) StoreCredential(
+	ctx context.Context,
+	username, password, description string,
+	vaultPassword string,
+) (gophkeeper.ResourceID, error) {
+	var meta, metaError = json.Marshal(
+		map[string]any{
+			"type":        (int)(resourceTypeCredential),
+			"description": description,
+		},
+	)
+	if metaError != nil {
+		return -1, metaError
+	}
+	var content, contentError = json.Marshal(
+		map[string]any{
+			"username": username,
+			"password": password,
+		},
+	)
+	if contentError != nil {
+		return -1, contentError
+	}
+	var piece = gophkeeper.Piece{
+		Meta:    (string)(meta),
+		Content: content,
+	}
+	return i.origin.StorePiece(ctx, piece, vaultPassword)
+}
