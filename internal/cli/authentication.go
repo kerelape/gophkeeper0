@@ -82,9 +82,15 @@ func (a authenticationModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			switch {
 			case a.username.Focused():
+				if len(a.username.Value()) < 1 {
+					return a, textinput.Blink
+				}
 				a.username.Blur()
 				a.password.Focus()
 			case a.password.Focused():
+				if len(a.password.Value()) < 1 {
+					return a, textinput.Blink
+				}
 				a.password.Blur()
 				return a, tea.Quit
 			}
@@ -98,26 +104,14 @@ func (a authenticationModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View implements tea.Model.
 func (a authenticationModel) View() string {
-	var fieldStyle = lipgloss.NewStyle().
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("#0088AA")).
-		Padding(0, 1, 0, 1)
-	return lipgloss.Place(
+	return form(
 		a.width, a.height,
-		lipgloss.Center, lipgloss.Center,
+		"Authenticate to Gophkeeper",
 		lipgloss.JoinVertical(
-			lipgloss.Center,
-			"Enter your credentials",
-			fieldStyle.Render(
-				lipgloss.JoinVertical(
-					lipgloss.Left,
-					a.username.View(),
-					lipgloss.NewStyle().
-						Foreground(lipgloss.Color("#004488")).
-						Render(strings.Repeat("─", 64)),
-					a.password.View(),
-				),
-			),
+			lipgloss.Left,
+			a.username.View(),
+			strings.Repeat(" ", 64),
+			a.password.View(),
 		),
 	)
 }
