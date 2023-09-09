@@ -23,7 +23,6 @@ var _ runnable.Runnable = (*CLI)(nil)
 // @todo #3 Implement `store-file <description> <path>` command.
 // @todo #3 Implement `store-card <description> <cardholder> <number> <date> <cvv/cvc> command.
 // @todo #3 Implement `store-text <description> <content>` command.
-// @todo #3 Implement `restore-credential <rid>` command.
 // @todo #3 Implement `restore-file <rid>` command.
 // @todo #3 Implement `restore-card <rid>` command.
 // @todo #3 Implement `restore-text <rid>` command.
@@ -38,20 +37,30 @@ func (c *CLI) Run(ctx context.Context) error {
 		"store-credential": &storeCredentialCommand{
 			gophkeeper: c.Gophkeeper,
 		},
+		"restore-credential": &restoreCredentialCommand{
+			gophkeeper: c.Gophkeeper,
+		},
 	}
 	if len(c.CommandLine) < 1 {
 		return errors.New("command not specified")
 	}
 	if c.CommandLine[0] == "help" {
 		for n, c := range commands {
-			fmt.Printf("%s - %s\n", n, c.Description())
+			fmt.Printf("%s %s - %s\n", n, c.Help(), c.Description())
 		}
 		return nil
 	}
 	if command, ok := commands[c.CommandLine[0]]; ok {
-		correct, err := command.Execute(ctx, (stack.Stack[string])(c.CommandLine[1:]))
+		var (
+			input = (stack.Stack[string])(c.CommandLine[1:])
+			args  = make(stack.Stack[string], 0, len(input))
+		)
+		for len(input) > 0 {
+			args.Push(input.Pop())
+		}
+		correct, err := command.Execute(ctx, args)
 		if !correct {
-			println(command.Help())
+			fmt.Printf("%s %s\n", c.CommandLine[0], command.Help())
 			return nil
 		}
 		if err != nil {

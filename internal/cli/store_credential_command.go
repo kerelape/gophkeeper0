@@ -44,7 +44,12 @@ func (s *storeCredentialCommand) Execute(ctx context.Context, args stack.Stack[s
 	if credentialError != nil {
 		return true, credentialError
 	}
-	rid, storeError := identity.StoreCredential(ctx, username, password, description, vaultPassword)
+	var resource = credentialResource{
+		description: description,
+		username:    username,
+		password:    password,
+	}
+	rid, storeError := identity.StoreCredential(ctx, resource, vaultPassword)
 	if storeError != nil {
 		return true, storeError
 	}

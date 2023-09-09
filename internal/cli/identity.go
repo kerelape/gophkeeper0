@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/kerelape/gophkeeper/pkg/gophkeeper"
 )
@@ -41,6 +42,12 @@ type resource struct {
 	Type        resourceType
 }
 
+type credentialResource struct {
+	description string
+	username    string
+	password    string
+}
+
 func (i identity) List(ctx context.Context) ([]resource, error) {
 	var resources, resourcesError = i.origin.List(ctx)
 	if resourcesError != nil {
@@ -64,15 +71,11 @@ func (i identity) List(ctx context.Context) ([]resource, error) {
 	return result, nil
 }
 
-func (i identity) StoreCredential(
-	ctx context.Context,
-	username, password, description string,
-	vaultPassword string,
-) (gophkeeper.ResourceID, error) {
+func (i identity) StoreCredential(ctx context.Context, cred credentialResource, vaultPassword string) (gophkeeper.ResourceID, error) {
 	var meta, metaError = json.Marshal(
 		map[string]any{
 			"type":        (int)(resourceTypeCredential),
-			"description": description,
+			"description": cred.description,
 		},
 	)
 	if metaError != nil {
@@ -80,8 +83,8 @@ func (i identity) StoreCredential(
 	}
 	var content, contentError = json.Marshal(
 		map[string]any{
-			"username": username,
-			"password": password,
+			"username": cred.username,
+			"password": cred.password,
 		},
 	)
 	if contentError != nil {
@@ -92,4 +95,37 @@ func (i identity) StoreCredential(
 		Content: content,
 	}
 	return i.origin.StorePiece(ctx, piece, vaultPassword)
+}
+
+func (i identity) RestoreCredential(ctx context.Context, rid gophkeeper.ResourceID, vaultPassword string) (credentialResource, error) {
+	var piece, pieceError = i.origin.RestorePiece(ctx, rid, vaultPassword)
+	if pieceError != nil {
+		return credentialResource{}, pieceError
+	}
+
+	var meta struct {
+		Type        resourceType `json:"type"`
+		Description string       `json:"description"`
+	}
+	if err := json.Unmarshal(([]byte)(piece.Meta), &meta); err != nil {
+		return credentialResource{}, err
+	}
+	if meta.Type != resourceTypeCredential {
+		return credentialResource{}, errors.New("invalid resource type")
+	}
+
+	var content struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := json.Unmarshal(piece.Content, &content); err != nil {
+		return credentialResource{}, err
+	}
+
+	var res = credentialResource{
+		description: meta.Description,
+		username:    content.Username,
+		password:    content.Password,
+	}
+	return res, nil
 }
