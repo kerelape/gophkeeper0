@@ -48,6 +48,11 @@ type credentialResource struct {
 	password    string
 }
 
+type textResource struct {
+	description string
+	content     string
+}
+
 func (i identity) List(ctx context.Context) ([]resource, error) {
 	var resources, resourcesError = i.origin.List(ctx)
 	if resourcesError != nil {
@@ -128,4 +133,21 @@ func (i identity) RestoreCredential(ctx context.Context, rid gophkeeper.Resource
 		password:    content.Password,
 	}
 	return res, nil
+}
+
+func (i identity) StoreText(ctx context.Context, resource textResource, vaultPassword string) (gophkeeper.ResourceID, error) {
+	var meta, metaError = json.Marshal(
+		map[string]any{
+			"type":        (int)(resourceTypeCredential),
+			"description": resource.description,
+		},
+	)
+	if metaError != nil {
+		return -1, metaError
+	}
+	var piece = gophkeeper.Piece{
+		Meta:    (string)(meta),
+		Content: ([]byte)(resource.content),
+	}
+	return i.origin.StorePiece(ctx, piece, vaultPassword)
 }
