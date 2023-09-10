@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 
 	"github.com/kerelape/gophkeeper/internal/stack"
@@ -43,6 +44,8 @@ func (d *deleteCommand) Execute(ctx context.Context, args stack.Stack[string]) (
 	if err := identity.Delete(ctx, (gophkeeper.ResourceID)(rid)); err != nil {
 		return true, err
 	}
+
+	fmt.Printf("Successfully deleted resource (RID: %d),\n", rid)
 
 	return true, nil
 }
