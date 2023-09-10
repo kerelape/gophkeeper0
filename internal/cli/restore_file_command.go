@@ -28,8 +28,8 @@ func (r *restoreFileCommand) Help() string {
 
 // Execute implements command.
 func (r *restoreFileCommand) Execute(ctx context.Context, args stack.Stack[string]) (bool, error) {
-	if len(args) != 1 {
-		return false, errors.New("expected 2 argument")
+	if len(args) != 2 {
+		return false, errors.New("expected 2 arguments")
 	}
 
 	var rid, ridError = strconv.Atoi(args.Pop())

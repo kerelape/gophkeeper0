@@ -69,7 +69,6 @@ func (c *CLI) Run(ctx context.Context) error {
 		correct, err := command.Execute(ctx, args)
 		if !correct {
 			fmt.Printf("%s %s\n", c.CommandLine[0], command.Help())
-			return nil
 		}
 		if err != nil {
 			return fmt.Errorf("failed to execute command %s: %w", c.CommandLine[0], err)
