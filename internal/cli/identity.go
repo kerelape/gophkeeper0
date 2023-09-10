@@ -44,21 +44,25 @@ type resource struct {
 	Type        resourceType
 }
 
-type credentialResource struct {
-	description string
-	username    string
-	password    string
-}
-
-type textResource struct {
-	description string
-	content     string
-}
-
-type fileResource struct {
-	description string
-	path        string
-}
+type (
+	credentialResource struct {
+		description string
+		username    string
+		password    string
+	}
+	textResource struct {
+		description string
+		content     string
+	}
+	fileResource struct {
+		description string
+		path        string
+	}
+	cardResource struct {
+		cardInfo
+		description string
+	}
+)
 
 func (i identity) List(ctx context.Context) ([]resource, error) {
 	var resources, resourcesError = i.origin.List(ctx)
@@ -245,4 +249,39 @@ func (i identity) RestoreFile(ctx context.Context, rid gophkeeper.ResourceID, pa
 		description: meta.Description,
 	}
 	return resource, nil
+}
+
+func (i identity) StoreCard(ctx context.Context, resource cardResource, vaultPassword string) (gophkeeper.ResourceID, error) {
+	var meta, metaError = json.Marshal(
+		map[string]any{
+			"type":        (int)(resourceTypeCard),
+			"description": resource.description,
+		},
+	)
+	if metaError != nil {
+		return -1, metaError
+	}
+
+	var content, contentError = json.Marshal(
+		map[string]any{
+			"ccn":    resource.ccn,
+			"exp":    resource.exp,
+			"cvv":    resource.cvv,
+			"holder": resource.holder,
+		},
+	)
+	if contentError != nil {
+		return -1, contentError
+	}
+
+	var piece = gophkeeper.Piece{
+		Meta:    (string)(meta),
+		Content: content,
+	}
+	var rid, ridError = i.origin.StorePiece(ctx, piece, vaultPassword)
+	if ridError != nil {
+		return -1, ridError
+	}
+
+	return rid, nil
 }
