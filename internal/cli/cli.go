@@ -19,9 +19,6 @@ type CLI struct {
 var _ runnable.Runnable = (*CLI)(nil)
 
 // Run implements runnable.Runnable.
-//
-// @todo #3 Implement `store-card <description> <cardholder> <number> <date> <cvv/cvc> command.
-// @todo #3 Implement `restore-card <rid>` command.
 func (c *CLI) Run(ctx context.Context) error {
 	var commands = map[string]command{
 		"register": &registerCommand{
@@ -46,6 +43,12 @@ func (c *CLI) Run(ctx context.Context) error {
 			gophkeeper: c.Gophkeeper,
 		},
 		"restore-file": &restoreFileCommand{
+			gophkeeper: c.Gophkeeper,
+		},
+		"store-card": &storeCardCommand{
+			gophkeeper: c.Gophkeeper,
+		},
+		"restore-card": &restoreCardCommand{
 			gophkeeper: c.Gophkeeper,
 		},
 		"delete": &deleteCommand{

@@ -44,21 +44,25 @@ type resource struct {
 	Type        resourceType
 }
 
-type credentialResource struct {
-	description string
-	username    string
-	password    string
-}
-
-type textResource struct {
-	description string
-	content     string
-}
-
-type fileResource struct {
-	description string
-	path        string
-}
+type (
+	credentialResource struct {
+		description string
+		username    string
+		password    string
+	}
+	textResource struct {
+		description string
+		content     string
+	}
+	fileResource struct {
+		description string
+		path        string
+	}
+	cardResource struct {
+		cardInfo
+		description string
+	}
+)
 
 func (i identity) List(ctx context.Context) ([]resource, error) {
 	var resources, resourcesError = i.origin.List(ctx)
@@ -243,6 +247,80 @@ func (i identity) RestoreFile(ctx context.Context, rid gophkeeper.ResourceID, pa
 	var resource = fileResource{
 		path:        file.Name(),
 		description: meta.Description,
+	}
+	return resource, nil
+}
+
+func (i identity) StoreCard(ctx context.Context, resource cardResource, vaultPassword string) (gophkeeper.ResourceID, error) {
+	var meta, metaError = json.Marshal(
+		map[string]any{
+			"type":        (int)(resourceTypeCard),
+			"description": resource.description,
+		},
+	)
+	if metaError != nil {
+		return -1, metaError
+	}
+
+	var content, contentError = json.Marshal(
+		map[string]any{
+			"ccn":    resource.ccn,
+			"exp":    resource.exp,
+			"cvv":    resource.cvv,
+			"holder": resource.holder,
+		},
+	)
+	if contentError != nil {
+		return -1, contentError
+	}
+
+	var piece = gophkeeper.Piece{
+		Meta:    (string)(meta),
+		Content: content,
+	}
+	var rid, ridError = i.origin.StorePiece(ctx, piece, vaultPassword)
+	if ridError != nil {
+		return -1, ridError
+	}
+
+	return rid, nil
+}
+
+func (i identity) RestoreCard(ctx context.Context, rid gophkeeper.ResourceID, vaultPassword string) (cardResource, error) {
+	var piece, pieceError = i.origin.RestorePiece(ctx, rid, vaultPassword)
+	if pieceError != nil {
+		return cardResource{}, pieceError
+	}
+
+	var meta struct {
+		Type        resourceType `json:"type"`
+		Description string       `json:"description"`
+	}
+	if err := json.Unmarshal(([]byte)(piece.Meta), &meta); err != nil {
+		return cardResource{}, err
+	}
+	if meta.Type != resourceTypeCard {
+		return cardResource{}, errors.New("invalid resource type")
+	}
+
+	var content struct {
+		CCN    string `json:"ccn"`
+		EXP    string `json:"exp"`
+		CVV    string `json:"cvv"`
+		Holder string `json:"holder"`
+	}
+	if err := json.Unmarshal(piece.Content, &content); err != nil {
+		return cardResource{}, err
+	}
+
+	var resource = cardResource{
+		description: meta.Description,
+		cardInfo: cardInfo{
+			ccn:    content.CCN,
+			exp:    content.EXP,
+			cvv:    content.CVV,
+			holder: content.Holder,
+		},
 	}
 	return resource, nil
 }
