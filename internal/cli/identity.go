@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -208,4 +209,40 @@ func (i identity) StoreFile(ctx context.Context, resource fileResource, vaultPas
 	}
 
 	return rid, nil
+}
+
+func (i identity) RestoreFile(ctx context.Context, rid gophkeeper.ResourceID, path, vaultPassword string) (fileResource, error) {
+	var blob, blobError = i.origin.RestoreBlob(ctx, rid, vaultPassword)
+	if blobError != nil {
+		return fileResource{}, blobError
+	}
+	defer blob.Content.Close()
+
+	var meta struct {
+		Type        resourceType `json:"type"`
+		Description string       `json:"description"`
+	}
+	if err := json.Unmarshal(([]byte)(blob.Meta), &meta); err != nil {
+		return fileResource{}, err
+	}
+	if meta.Type != resourceTypeFile {
+		return fileResource{}, errors.New("invalid resource type")
+	}
+
+	var file, fileError = os.Create(path)
+	if fileError != nil {
+		return fileResource{}, fileError
+	}
+	defer file.Close()
+
+	var input = bufio.NewReader(blob.Content)
+	if _, err := input.WriteTo(file); err != nil {
+		return fileResource{}, err
+	}
+
+	var resource = fileResource{
+		path:        file.Name(),
+		description: meta.Description,
+	}
+	return resource, nil
 }
