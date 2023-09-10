@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
 
 	"github.com/kerelape/gophkeeper/pkg/gophkeeper"
 )
@@ -51,6 +52,11 @@ type credentialResource struct {
 type textResource struct {
 	description string
 	content     string
+}
+
+type fileResource struct {
+	description string
+	path        string
 }
 
 func (i identity) List(ctx context.Context) ([]resource, error) {
@@ -174,4 +180,32 @@ func (i identity) RestoreText(ctx context.Context, rid gophkeeper.ResourceID, va
 		content:     (string)(piece.Content),
 	}
 	return resource, nil
+}
+
+func (i identity) StoreFile(ctx context.Context, resource fileResource, vaultPassword string) (gophkeeper.ResourceID, error) {
+	var meta, metaError = json.Marshal(
+		map[string]any{
+			"type":        (int)(resourceTypeFile),
+			"description": resource.description,
+		},
+	)
+	if metaError != nil {
+		return -1, metaError
+	}
+
+	var file, fileError = os.Open(resource.path)
+	if fileError != nil {
+		return -1, fileError
+	}
+
+	var blob = gophkeeper.Blob{
+		Meta:    (string)(meta),
+		Content: file,
+	}
+	var rid, ridError = i.origin.StoreBlob(ctx, blob, vaultPassword)
+	if ridError != nil {
+		return -1, ridError
+	}
+
+	return rid, nil
 }
