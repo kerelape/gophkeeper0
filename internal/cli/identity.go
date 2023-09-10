@@ -285,3 +285,42 @@ func (i identity) StoreCard(ctx context.Context, resource cardResource, vaultPas
 
 	return rid, nil
 }
+
+func (i identity) RestoreCard(ctx context.Context, rid gophkeeper.ResourceID, vaultPassword string) (cardResource, error) {
+	var piece, pieceError = i.origin.RestorePiece(ctx, rid, vaultPassword)
+	if pieceError != nil {
+		return cardResource{}, pieceError
+	}
+
+	var meta struct {
+		Type        resourceType `json:"type"`
+		Description string       `json:"description"`
+	}
+	if err := json.Unmarshal(([]byte)(piece.Meta), &meta); err != nil {
+		return cardResource{}, err
+	}
+	if meta.Type != resourceTypeCard {
+		return cardResource{}, errors.New("invalid resource type")
+	}
+
+	var content struct {
+		CCN    string `json:"ccn"`
+		EXP    string `json:"exp"`
+		CVV    string `json:"cvv"`
+		Holder string `json:"holder"`
+	}
+	if err := json.Unmarshal(piece.Content, &content); err != nil {
+		return cardResource{}, err
+	}
+
+	var resource = cardResource{
+		description: meta.Description,
+		cardInfo: cardInfo{
+			ccn:    content.CCN,
+			exp:    content.EXP,
+			cvv:    content.CVV,
+			holder: content.Holder,
+		},
+	}
+	return resource, nil
+}

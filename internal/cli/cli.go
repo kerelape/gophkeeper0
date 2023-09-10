@@ -51,6 +51,9 @@ func (c *CLI) Run(ctx context.Context) error {
 		"store-card": &storeCardCommand{
 			gophkeeper: c.Gophkeeper,
 		},
+		"restore-card": &restoreCardCommand{
+			gophkeeper: c.Gophkeeper,
+		},
 		"delete": &deleteCommand{
 			gophkeeper: c.Gophkeeper,
 		},
