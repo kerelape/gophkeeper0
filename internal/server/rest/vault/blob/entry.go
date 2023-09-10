@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
-	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -112,18 +111,10 @@ func (e *Entry) decrypt(out http.ResponseWriter, in *http.Request) {
 	out.WriteHeader(http.StatusOK)
 
 	var output = bufio.NewWriter(out)
-	var input = bufio.NewReader(blob.Content)
-	for {
-		var ic, icError = input.ReadByte()
-		if icError != nil {
-			if !errors.Is(icError, io.EOF) {
-				log.Printf("failed to read input: %s", icError.Error())
-			}
-			break
-		}
-		if err := output.WriteByte(ic); err != nil {
-			log.Printf("failed to write output: %s", err.Error())
-			break
-		}
+	if _, err := output.ReadFrom(blob.Content); err != nil {
+		log.Printf("failed to write content: %s", err.Error())
+	}
+	if err := output.Flush(); err != nil {
+		log.Printf("failed to flush content: %s", err.Error())
 	}
 }
