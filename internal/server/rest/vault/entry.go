@@ -85,22 +85,14 @@ func (e *Entry) delete(out http.ResponseWriter, in *http.Request) {
 		return
 	}
 
-	var rid gophkeeper.ResourceID
-	if value := chi.URLParam(in, "rid"); value != "" {
-		if value, err := strconv.Atoi(value); err != nil {
-			rid = (gophkeeper.ResourceID)(value)
-		} else {
-			var status = http.StatusBadRequest
-			http.Error(out, http.StatusText(status), status)
-			return
-		}
-	} else {
+	var rid, ridError = strconv.Atoi(chi.URLParam(in, "rid"))
+	if ridError != nil {
 		var status = http.StatusBadRequest
 		http.Error(out, http.StatusText(status), status)
 		return
 	}
 
-	if err := identity.Delete(in.Context(), rid); err != nil {
+	if err := identity.Delete(in.Context(), (gophkeeper.ResourceID)(rid)); err != nil {
 		var status = http.StatusInternalServerError
 		if errors.Is(err, gophkeeper.ErrResourceNotFound) {
 			status = http.StatusNotFound

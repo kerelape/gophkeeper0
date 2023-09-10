@@ -238,6 +238,8 @@ func (i *RestIdentity) Delete(ctx context.Context, rid ResourceID) error {
 		return nil
 	case http.StatusInternalServerError:
 		return ErrServerIsDown
+	case http.StatusNotFound:
+		return ErrResourceNotFound
 	default:
 		return errors.Join(
 			fmt.Errorf("unexpected response code: %d", response.StatusCode),

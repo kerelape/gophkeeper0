@@ -48,6 +48,9 @@ func (c *CLI) Run(ctx context.Context) error {
 		"restore-file": &restoreFileCommand{
 			gophkeeper: c.Gophkeeper,
 		},
+		"delete": &deleteCommand{
+			gophkeeper: c.Gophkeeper,
+		},
 	}
 	if len(c.CommandLine) < 1 {
 		return errors.New("command not specified")
