@@ -10,32 +10,33 @@ import (
 	"github.com/kerelape/gophkeeper/pkg/gophkeeper"
 )
 
-type restoreCredentialCommand struct {
+type restoreFileCommand struct {
 	gophkeeper gophkeeper.Gophkeeper
 }
 
-var _ command = (*restoreCredentialCommand)(nil)
+var _ command = (*restoreFileCommand)(nil)
 
 // Description implements command.
-func (r *restoreCredentialCommand) Description() string {
-	return "Restore a username-password pair."
+func (r *restoreFileCommand) Description() string {
+	return "Restore file."
 }
 
 // Help implements command.
-func (r *restoreCredentialCommand) Help() string {
-	return "<RID: int>"
+func (r *restoreFileCommand) Help() string {
+	return "<RID: int> <path: string>"
 }
 
 // Execute implements command.
-func (r *restoreCredentialCommand) Execute(ctx context.Context, args stack.Stack[string]) (bool, error) {
-	if len(args) != 1 {
-		return false, errors.New("expected 1 arguments")
+func (r *restoreFileCommand) Execute(ctx context.Context, args stack.Stack[string]) (bool, error) {
+	if len(args) != 2 {
+		return false, errors.New("expected 2 arguments")
 	}
 
 	var rid, ridError = strconv.Atoi(args.Pop())
 	if ridError != nil {
 		return false, ridError
 	}
+	var path = args.Pop()
 
 	var gophkeeperIdentity, gophkeeperIdentityError = authenticate(ctx, r.gophkeeper)
 	if gophkeeperIdentityError != nil {
@@ -50,14 +51,12 @@ func (r *restoreCredentialCommand) Execute(ctx context.Context, args stack.Stack
 	var identity = identity{
 		origin: gophkeeperIdentity,
 	}
-	var resource, resourceError = identity.RestoreCredential(ctx, (gophkeeper.ResourceID)(rid), vaultPassword)
+	var resource, resourceError = identity.RestoreFile(ctx, (gophkeeper.ResourceID)(rid), path, vaultPassword)
 	if resourceError != nil {
 		return true, resourceError
 	}
 
-	fmt.Printf("(%d) Credential\n", rid)
-	fmt.Printf("\tUsername: %s\n", resource.username)
-	fmt.Printf("\tPassword: %s\n\n", resource.password)
+	fmt.Printf("Restored resource (RID: %d) to file: %s\n", rid, resource.path)
 
 	return true, nil
 }

@@ -1,9 +1,11 @@
 package cli
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
 
 	"github.com/kerelape/gophkeeper/pkg/gophkeeper"
 )
@@ -51,6 +53,11 @@ type credentialResource struct {
 type textResource struct {
 	description string
 	content     string
+}
+
+type fileResource struct {
+	description string
+	path        string
 }
 
 func (i identity) List(ctx context.Context) ([]resource, error) {
@@ -172,6 +179,70 @@ func (i identity) RestoreText(ctx context.Context, rid gophkeeper.ResourceID, va
 	var resource = textResource{
 		description: meta.Description,
 		content:     (string)(piece.Content),
+	}
+	return resource, nil
+}
+
+func (i identity) StoreFile(ctx context.Context, resource fileResource, vaultPassword string) (gophkeeper.ResourceID, error) {
+	var meta, metaError = json.Marshal(
+		map[string]any{
+			"type":        (int)(resourceTypeFile),
+			"description": resource.description,
+		},
+	)
+	if metaError != nil {
+		return -1, metaError
+	}
+
+	var file, fileError = os.Open(resource.path)
+	if fileError != nil {
+		return -1, fileError
+	}
+
+	var blob = gophkeeper.Blob{
+		Meta:    (string)(meta),
+		Content: file,
+	}
+	var rid, ridError = i.origin.StoreBlob(ctx, blob, vaultPassword)
+	if ridError != nil {
+		return -1, ridError
+	}
+
+	return rid, nil
+}
+
+func (i identity) RestoreFile(ctx context.Context, rid gophkeeper.ResourceID, path, vaultPassword string) (fileResource, error) {
+	var blob, blobError = i.origin.RestoreBlob(ctx, rid, vaultPassword)
+	if blobError != nil {
+		return fileResource{}, blobError
+	}
+	defer blob.Content.Close()
+
+	var meta struct {
+		Type        resourceType `json:"type"`
+		Description string       `json:"description"`
+	}
+	if err := json.Unmarshal(([]byte)(blob.Meta), &meta); err != nil {
+		return fileResource{}, err
+	}
+	if meta.Type != resourceTypeFile {
+		return fileResource{}, errors.New("invalid resource type")
+	}
+
+	var file, fileError = os.Create(path)
+	if fileError != nil {
+		return fileResource{}, fileError
+	}
+	defer file.Close()
+
+	var input = bufio.NewReader(blob.Content)
+	if _, err := input.WriteTo(file); err != nil {
+		return fileResource{}, err
+	}
+
+	var resource = fileResource{
+		path:        file.Name(),
+		description: meta.Description,
 	}
 	return resource, nil
 }

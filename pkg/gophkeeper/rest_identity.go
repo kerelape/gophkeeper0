@@ -1,7 +1,6 @@
 package gophkeeper
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/base64"
@@ -9,10 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
-
-	composedreadcloser "github.com/kerelape/gophkeeper/internal/composed_read_closer"
-	sequencereader "github.com/kerelape/gophkeeper/internal/sequence_reader"
 )
 
 // ErrServerIsDown is returns when server returned an internal server error.
@@ -144,27 +139,18 @@ func (i *RestIdentity) RestorePiece(ctx context.Context, rid ResourceID, passwor
 
 // StoreBlob implements Identity.
 func (i *RestIdentity) StoreBlob(ctx context.Context, blob Blob, password string) (ResourceID, error) {
-	var (
-		endpoint = fmt.Sprintf("%s/vault/blob", i.Server)
-		header   = fmt.Sprintf("%s\n", blob.Meta)
-	)
-
+	var endpoint = fmt.Sprintf("%s/vault/blob", i.Server)
 	var request, requestError = http.NewRequestWithContext(
 		ctx,
 		http.MethodPut, endpoint,
-		&composedreadcloser.ComposedReadCloser{
-			Reader: &sequencereader.SequenceReader{
-				strings.NewReader(header),
-				blob.Content,
-			},
-			Closer: blob.Content,
-		},
+		blob.Content,
 	)
 	if requestError != nil {
 		return -1, requestError
 	}
 	request.Header.Set("Authorization", (string)(i.Token))
 	request.Header.Set("X-Password", password)
+	request.Header.Set("X-Meta", blob.Meta)
 
 	response, responseError := i.Client.Do(request)
 	if responseError != nil {
@@ -173,23 +159,13 @@ func (i *RestIdentity) StoreBlob(ctx context.Context, blob Blob, password string
 
 	switch response.StatusCode {
 	case http.StatusCreated:
-		var content = make(map[string]any)
+		var content struct {
+			RID ResourceID `json:"rid"`
+		}
 		if err := json.NewDecoder(response.Body).Decode(&content); err != nil {
-			return -1, errors.Join(
-				fmt.Errorf("parse response: %w", err),
-				ErrIncompatibleAPI,
-			)
+			return -1, ErrIncompatibleAPI
 		}
-		var rid ResourceID
-		if value, ok := content["value"].(int64); ok {
-			rid = (ResourceID)(value)
-		} else {
-			return -1, errors.Join(
-				fmt.Errorf("invalid response body"),
-				ErrIncompatibleAPI,
-			)
-		}
-		return rid, nil
+		return content.RID, nil
 	case http.StatusUnauthorized:
 		return -1, ErrBadCredential
 	case http.StatusInternalServerError:
@@ -222,17 +198,8 @@ func (i *RestIdentity) RestoreBlob(ctx context.Context, rid ResourceID, password
 	}
 	switch response.StatusCode {
 	case http.StatusOK:
-		var in = bufio.NewReader(response.Body)
-		var meta, metaError = in.ReadString('\n')
-		if metaError != nil {
-			return Blob{}, errors.Join(
-				fmt.Errorf("parse response: %w", metaError),
-				ErrIncompatibleAPI,
-			)
-		}
-		meta = strings.TrimSuffix(meta, "\n")
 		var blob = Blob{
-			Meta:    meta,
+			Meta:    response.Header.Get("X-Meta"),
 			Content: response.Body,
 		}
 		return blob, nil

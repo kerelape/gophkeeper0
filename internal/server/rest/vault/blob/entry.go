@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/kerelape/gophkeeper/pkg/gophkeeper"
@@ -38,24 +37,16 @@ func (e *Entry) encrypt(out http.ResponseWriter, in *http.Request) {
 		return
 	}
 
-	var body = bufio.NewReader(in.Body)
-	var meta, metaError = body.ReadString('\n')
-	if metaError != nil {
-		var status = http.StatusBadRequest
-		http.Error(out, http.StatusText(status), status)
-		return
-	}
-	meta = strings.TrimSuffix(meta, "\n")
-
-	var blob = gophkeeper.Blob{
-		Meta:    meta,
-		Content: in.Body,
-	}
 	var password = in.Header.Get("X-Password")
 	if password == "" {
 		var status = http.StatusUnauthorized
 		http.Error(out, http.StatusText(status), status)
 		return
+	}
+
+	var blob = gophkeeper.Blob{
+		Meta:    in.Header.Get("X-Meta"),
+		Content: in.Body,
 	}
 	rid, storeError := identity.StoreBlob(in.Context(), blob, password)
 	if storeError != nil {
@@ -96,16 +87,14 @@ func (e *Entry) decrypt(out http.ResponseWriter, in *http.Request) {
 		return
 	}
 
-	var request struct {
-		Password string `json:"password"`
-	}
-	if err := json.NewDecoder(in.Body).Decode(&request); err != nil {
+	var password = in.Header.Get("X-Password")
+	if password == "" {
 		var status = http.StatusBadRequest
 		http.Error(out, http.StatusText(status), status)
 		return
 	}
 
-	var blob, restoreError = identity.RestoreBlob(in.Context(), (gophkeeper.ResourceID)(rid), request.Password)
+	var blob, restoreError = identity.RestoreBlob(in.Context(), (gophkeeper.ResourceID)(rid), password)
 	if restoreError != nil {
 		var status = http.StatusInternalServerError
 		if errors.Is(identityError, gophkeeper.ErrBadCredential) {
@@ -114,20 +103,18 @@ func (e *Entry) decrypt(out http.ResponseWriter, in *http.Request) {
 		http.Error(out, http.StatusText(status), status)
 		return
 	}
+	defer blob.Content.Close()
 
+	out.Header().Set("Content-Type", "application/octet-stream")
+	out.Header().Set("Content-Disposition", "attachment")
+	out.Header().Set("X-Meta", blob.Meta)
 	out.WriteHeader(http.StatusOK)
 
 	var output = bufio.NewWriter(out)
-	if _, err := output.WriteString(blob.Meta); err != nil {
-		log.Printf("failed to write meta: %s", err.Error())
-	}
-	if err := output.WriteByte(0x00); err != nil {
-		log.Printf("failed to write meta delimiter: %s", err.Error())
-	}
-	if err := output.Flush(); err != nil {
-		log.Printf("failed to flush meta: %s", err.Error())
-	}
 	if _, err := output.ReadFrom(blob.Content); err != nil {
 		log.Printf("failed to write content: %s", err.Error())
+	}
+	if err := output.Flush(); err != nil {
+		log.Printf("failed to flush content: %s", err.Error())
 	}
 }

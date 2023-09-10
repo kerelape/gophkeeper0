@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/kerelape/gophkeeper/internal/stack"
 	"github.com/kerelape/gophkeeper/pkg/gophkeeper"
@@ -56,14 +55,7 @@ func (r *restoreTextCommand) Execute(ctx context.Context, args stack.Stack[strin
 		return true, resourceError
 	}
 
-	fmt.Printf(
-		"\n\033[2mDescription:\033[0m\r\n%s\n",
-		"\t"+strings.ReplaceAll(resource.description, "\n", "\n\t"),
-	)
-	fmt.Printf(
-		"\n\033[2mContent:\033[0m\r\n%s\n\n",
-		"\t"+strings.ReplaceAll(resource.content, "\n", "\n\t"),
-	)
+	fmt.Printf("\n%s\n", resource.content)
 
 	return true, nil
 }
