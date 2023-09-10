@@ -307,7 +307,7 @@ func (i *Identity) Delete(ctx context.Context, rid gophkeeper.ResourceID) error 
 
 	var deleteResourceResult = transaction.QueryRow(
 		ctx,
-		`DELETE FROM resources WHERE id = $1 AND 'owner' = $2 RETURNING ('type', 'resource')`,
+		`DELETE FROM resources WHERE id = $1 AND owner = $2 RETURNING type, resource`,
 		(int64)(rid), i.Username,
 	)
 	var (
@@ -334,7 +334,7 @@ func (i *Identity) Delete(ctx context.Context, rid gophkeeper.ResourceID) error 
 	case gophkeeper.ResourceTypeBlob:
 		var deleteResult = transaction.QueryRow(
 			ctx,
-			`DELETE FROM blobs WHERE id = $1 RETURNING 'location'`,
+			`DELETE FROM blobs WHERE id = $1 RETURNING location`,
 			resourceID,
 		)
 		var location string
