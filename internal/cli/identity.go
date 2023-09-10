@@ -138,7 +138,7 @@ func (i identity) RestoreCredential(ctx context.Context, rid gophkeeper.Resource
 func (i identity) StoreText(ctx context.Context, resource textResource, vaultPassword string) (gophkeeper.ResourceID, error) {
 	var meta, metaError = json.Marshal(
 		map[string]any{
-			"type":        (int)(resourceTypeCredential),
+			"type":        (int)(resourceTypeText),
 			"description": resource.description,
 		},
 	)
@@ -150,4 +150,28 @@ func (i identity) StoreText(ctx context.Context, resource textResource, vaultPas
 		Content: ([]byte)(resource.content),
 	}
 	return i.origin.StorePiece(ctx, piece, vaultPassword)
+}
+
+func (i identity) RestoreText(ctx context.Context, rid gophkeeper.ResourceID, vaultPassword string) (textResource, error) {
+	var piece, pieceError = i.origin.RestorePiece(ctx, rid, vaultPassword)
+	if pieceError != nil {
+		return textResource{}, pieceError
+	}
+
+	var meta struct {
+		Type        resourceType `json:"type"`
+		Description string       `json:"description"`
+	}
+	if err := json.Unmarshal(([]byte)(piece.Meta), &meta); err != nil {
+		return textResource{}, err
+	}
+	if meta.Type != resourceTypeText {
+		return textResource{}, errors.New("invalid resource type")
+	}
+
+	var resource = textResource{
+		description: meta.Description,
+		content:     (string)(piece.Content),
+	}
+	return resource, nil
 }
